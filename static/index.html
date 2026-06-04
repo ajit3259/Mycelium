@@ -1,0 +1,551 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Mind</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+
+  body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    background: #0f0f0f;
+    color: #e0e0e0;
+    min-height: 100vh;
+  }
+
+  header {
+    padding: 20px 24px 0;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+  }
+
+  header h1 { font-size: 18px; font-weight: 600; letter-spacing: -0.3px; color: #fff; }
+
+  .dot {
+    width: 8px; height: 8px; border-radius: 50%;
+    background: #3a3a3a;
+    margin-left: auto;
+    transition: background 0.3s;
+  }
+  .dot.online { background: #4ade80; }
+
+  .capture-box {
+    margin: 20px 24px 0;
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 12px;
+    overflow: hidden;
+  }
+
+  .tabs {
+    display: flex;
+    border-bottom: 1px solid #2a2a2a;
+  }
+
+  .tab {
+    padding: 10px 16px;
+    font-size: 13px;
+    color: #666;
+    cursor: pointer;
+    border-bottom: 2px solid transparent;
+    margin-bottom: -1px;
+    transition: color 0.15s;
+  }
+  .tab.active { color: #fff; border-color: #fff; }
+
+  .tab-panel { display: none; padding: 14px; }
+  .tab-panel.active { display: block; }
+
+  textarea, input[type="url"], input[type="text"] {
+    width: 100%;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: #e0e0e0;
+    font-size: 14px;
+    line-height: 1.5;
+    resize: none;
+    font-family: inherit;
+  }
+
+  textarea { min-height: 80px; }
+
+  .drop-zone {
+    border: 1px dashed #333;
+    border-radius: 8px;
+    padding: 28px;
+    text-align: center;
+    color: #555;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+  }
+  .drop-zone:hover, .drop-zone.drag { border-color: #666; color: #999; }
+  .drop-zone input { display: none; }
+
+  .actions {
+    display: flex;
+    justify-content: flex-end;
+    padding: 10px 14px;
+    border-top: 1px solid #2a2a2a;
+  }
+
+  button.send {
+    background: #fff;
+    color: #000;
+    border: none;
+    border-radius: 7px;
+    padding: 7px 18px;
+    font-size: 13px;
+    font-weight: 500;
+    cursor: pointer;
+    transition: opacity 0.15s;
+  }
+  button.send:hover { opacity: 0.85; }
+  button.send:disabled { opacity: 0.4; cursor: default; }
+
+  .feed { padding: 20px 24px 40px; }
+  .feed-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-bottom: 12px;
+  }
+
+  .card {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+    animation: fadeIn 0.2s ease;
+  }
+  @keyframes fadeIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; } }
+
+  .card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .badge {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 500;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .badge-text { background: #1e3a5f; color: #60a5fa; }
+  .badge-link { background: #1e3f2a; color: #4ade80; }
+  .badge-image { background: #3f1e3f; color: #c084fc; }
+
+  .intent {
+    font-size: 10px;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-weight: 500;
+    flex-shrink: 0;
+    margin-top: 2px;
+  }
+  .intent-learn     { background: #2a1f00; color: #f59e0b; }
+  .intent-act       { background: #1a2f1a; color: #86efac; }
+  .intent-reference { background: #1a1a2f; color: #818cf8; }
+  .intent-ephemeral { background: #2a2a2a; color: #555; }
+
+  .card-summary { font-size: 14px; line-height: 1.5; color: #d0d0d0; }
+  .card-raw { font-size: 13px; color: #555; margin-top: 4px; word-break: break-all; }
+
+  .card-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    margin-top: 10px;
+  }
+  .tag {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: #252525;
+    border-radius: 4px;
+    color: #777;
+  }
+
+  .card-time {
+    font-size: 11px;
+    color: #444;
+    margin-top: 8px;
+  }
+
+  .processing {
+    font-size: 12px;
+    color: #555;
+    font-style: italic;
+  }
+
+  .empty {
+    text-align: center;
+    color: #444;
+    font-size: 14px;
+    padding: 40px 0;
+  }
+
+  .surface-bar {
+    display: flex;
+    gap: 8px;
+    margin: 20px 24px 0;
+  }
+
+  .surface-btn {
+    background: #1a1a1a;
+    border: 1px solid #2a2a2a;
+    border-radius: 8px;
+    color: #aaa;
+    padding: 8px 14px;
+    font-size: 13px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s;
+    font-family: inherit;
+  }
+  .surface-btn:hover { border-color: #555; color: #fff; }
+  .surface-btn.primary { border-color: #444; color: #fff; }
+
+  .surface-panel {
+    margin: 12px 24px 0;
+    display: none;
+  }
+  .surface-panel.open { display: block; }
+
+  .surface-header {
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    color: #444;
+    margin-bottom: 12px;
+  }
+
+  .surface-card {
+    background: #1a1a1a;
+    border: 1px solid #333;
+    border-radius: 10px;
+    padding: 14px;
+    margin-bottom: 10px;
+  }
+
+  .surface-card-top {
+    display: flex;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .surface-actions {
+    display: flex;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  .s-btn {
+    font-size: 12px;
+    padding: 5px 12px;
+    border-radius: 6px;
+    border: 1px solid #333;
+    background: transparent;
+    color: #777;
+    cursor: pointer;
+    font-family: inherit;
+    transition: all 0.15s;
+  }
+  .s-btn:hover { border-color: #555; color: #ccc; }
+  .s-btn.done { border-color: #4ade80; color: #4ade80; }
+  .s-btn.done:hover { background: #1e3f2a; }
+
+  .related-section {
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid #222;
+  }
+  .related-label {
+    font-size: 10px;
+    text-transform: uppercase;
+    letter-spacing: 0.7px;
+    color: #383838;
+    margin-bottom: 8px;
+  }
+  .related-card {
+    background: #141414;
+    border: 1px solid #222;
+    border-radius: 7px;
+    padding: 10px 12px;
+    margin-bottom: 6px;
+  }
+  .related-card:last-child { margin-bottom: 0; }
+  .related-summary { font-size: 12px; color: #888; line-height: 1.45; }
+  .related-tags { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+  .related-tag { font-size: 10px; padding: 1px 6px; background: #1e1e1e; border-radius: 3px; color: #555; }
+
+  .toast {
+    position: fixed;
+    bottom: 24px;
+    left: 50%;
+    transform: translateX(-50%) translateY(10px);
+    background: #fff;
+    color: #000;
+    padding: 8px 18px;
+    border-radius: 8px;
+    font-size: 13px;
+    font-weight: 500;
+    opacity: 0;
+    transition: opacity 0.2s, transform 0.2s;
+    pointer-events: none;
+  }
+  .toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Mind</h1>
+  <div class="dot" id="dot" title="LM Studio status"></div>
+</header>
+
+<div class="capture-box">
+  <div class="tabs">
+    <div class="tab active" data-tab="text">Note</div>
+    <div class="tab" data-tab="link">Link</div>
+    <div class="tab" data-tab="image">Image</div>
+  </div>
+
+  <div class="tab-panel active" id="panel-text">
+    <textarea id="text-input" placeholder="What's on your mind?" rows="4"></textarea>
+  </div>
+
+  <div class="tab-panel" id="panel-link">
+    <input type="url" id="link-input" placeholder="Paste a URL…">
+  </div>
+
+  <div class="tab-panel" id="panel-image">
+    <div class="drop-zone" id="drop-zone">
+      Drop an image or click to choose
+      <input type="file" id="file-input" accept="image/*">
+    </div>
+  </div>
+
+  <div class="actions">
+    <button class="send" id="send-btn">Capture</button>
+  </div>
+</div>
+
+<div class="surface-bar">
+  <button class="surface-btn primary" onclick="openSurface()">What should I look at?</button>
+  <button class="surface-btn" onclick="openSurface('learn')">Learn</button>
+  <button class="surface-btn" onclick="openSurface('act')">Act</button>
+</div>
+
+<div class="surface-panel" id="surface-panel">
+  <div class="surface-header">Surfaced for you</div>
+  <div id="surface-list"></div>
+</div>
+
+<div class="feed">
+  <div class="feed-header" style="display:flex;align-items:center;justify-content:space-between;">
+    Recent
+    <button onclick="loadFeed()" style="background:none;border:none;color:#444;font-size:12px;cursor:pointer;font-family:inherit;padding:0;" onmouseover="this.style.color='#aaa'" onmouseout="this.style.color='#444'">↻ refresh</button>
+  </div>
+  <div id="feed-list"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+  let activeTab = "text";
+
+  // tabs
+  document.querySelectorAll(".tab").forEach(t => {
+    t.addEventListener("click", () => {
+      document.querySelectorAll(".tab").forEach(x => x.classList.remove("active"));
+      document.querySelectorAll(".tab-panel").forEach(x => x.classList.remove("active"));
+      t.classList.add("active");
+      activeTab = t.dataset.tab;
+      document.getElementById(`panel-${activeTab}`).classList.add("active");
+    });
+  });
+
+  // drop zone
+  const dropZone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  dropZone.addEventListener("click", () => fileInput.click());
+  dropZone.addEventListener("dragover", e => { e.preventDefault(); dropZone.classList.add("drag"); });
+  dropZone.addEventListener("dragleave", () => dropZone.classList.remove("drag"));
+  dropZone.addEventListener("drop", e => {
+    e.preventDefault();
+    dropZone.classList.remove("drag");
+    if (e.dataTransfer.files[0]) handleFileSelect(e.dataTransfer.files[0]);
+  });
+  fileInput.addEventListener("change", () => { if (fileInput.files[0]) handleFileSelect(fileInput.files[0]); });
+
+  let selectedFile = null;
+  function handleFileSelect(f) {
+    selectedFile = f;
+    dropZone.textContent = f.name;
+  }
+
+  // send
+  document.getElementById("send-btn").addEventListener("click", capture);
+  document.addEventListener("keydown", e => {
+    if ((e.metaKey || e.ctrlKey) && e.key === "Enter") capture();
+  });
+
+  async function capture() {
+    const btn = document.getElementById("send-btn");
+    btn.disabled = true;
+
+    try {
+      if (activeTab === "text") {
+        const content = document.getElementById("text-input").value.trim();
+        if (!content) return;
+        const fd = new FormData();
+        fd.append("content", content);
+        await fetch("/capture/text", { method: "POST", body: fd });
+        document.getElementById("text-input").value = "";
+        toast("Captured");
+
+      } else if (activeTab === "link") {
+        const url = document.getElementById("link-input").value.trim();
+        if (!url) return;
+        const fd = new FormData();
+        fd.append("url", url);
+        await fetch("/capture/link", { method: "POST", body: fd });
+        document.getElementById("link-input").value = "";
+        toast("Link captured");
+
+      } else if (activeTab === "image") {
+        if (!selectedFile) return;
+        const fd = new FormData();
+        fd.append("file", selectedFile);
+        await fetch("/capture/image", { method: "POST", body: fd });
+        selectedFile = null;
+        dropZone.textContent = "Drop an image or click to choose";
+        toast("Image captured");
+      }
+
+      loadFeed();
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  // feed
+  async function loadFeed() {
+    const list = document.getElementById("feed-list");
+    const data = await fetch("/captures").then(r => r.json());
+
+    if (!data.length) {
+      list.innerHTML = '<div class="empty">Nothing captured yet</div>';
+      return;
+    }
+
+    list.innerHTML = data.map(c => {
+      const badge = `<span class="badge badge-${c.type}">${c.type}</span>`;
+      const intent = c.intent ? `<span class="intent intent-${c.intent}">${c.intent}</span>` : "";
+      const summary = c.summary
+        ? `<div class="card-summary">${c.summary}</div>`
+        : `<div class="processing">Processing…</div>`;
+      const raw = (c.type === "link" && c.source_url)
+        ? `<div class="card-raw">${c.source_url}</div>`
+        : (c.raw && !c.summary ? `<div class="card-raw">${c.raw}</div>` : "");
+      const tags = (c.tags || []).length
+        ? `<div class="card-tags">${c.tags.map(t => `<span class="tag">${t}</span>`).join("")}</div>`
+        : "";
+      const time = `<div class="card-time">${c.created_at}</div>`;
+      return `<div class="card">
+        <div class="card-top">${badge}${intent}<div>${summary}${raw}</div></div>
+        ${tags}${time}
+      </div>`;
+    }).join("");
+  }
+
+  // status dot
+  async function checkStatus() {
+    try {
+      const r = await fetch("/captures");
+      document.getElementById("dot").className = r.ok ? "dot online" : "dot";
+    } catch { document.getElementById("dot").className = "dot"; }
+  }
+
+  function toast(msg) {
+    const el = document.getElementById("toast");
+    el.textContent = msg;
+    el.classList.add("show");
+    setTimeout(() => el.classList.remove("show"), 2000);
+  }
+
+  async function openSurface(mode) {
+    const panel = document.getElementById("surface-panel");
+    const list = document.getElementById("surface-list");
+    panel.classList.add("open");
+    list.innerHTML = '<div style="color:#555;font-size:13px;padding:8px 0">Loading…</div>';
+
+    const url = mode ? `/surface?mode=${mode}` : "/surface";
+    const items = await fetch(url).then(r => r.json());
+
+    if (!items.length) {
+      list.innerHTML = '<div class="empty">Nothing to surface right now.</div>';
+      return;
+    }
+
+    list.innerHTML = items.map(c => {
+      const badge = `<span class="badge badge-${c.type}">${c.type}</span>`;
+      const intent = c.intent ? `<span class="intent intent-${c.intent}">${c.intent}</span>` : "";
+      const url_line = c.source_url
+        ? `<a href="${c.source_url}" target="_blank" style="color:#555;font-size:12px;word-break:break-all">${c.source_url}</a>`
+        : "";
+      const tags = (c.tags||[]).length
+        ? `<div class="card-tags">${c.tags.map(t=>`<span class="tag">${t}</span>`).join("")}</div>`
+        : "";
+
+      const related = (c.related||[]).map(r => {
+        const rtags = (r.tags||[]).length
+          ? `<div class="related-tags">${r.tags.map(t=>`<span class="related-tag">${t}</span>`).join("")}</div>`
+          : "";
+        return `<div class="related-card">
+          <div class="related-summary">${r.summary}</div>
+          ${rtags}
+        </div>`;
+      }).join("");
+      const related_section = related
+        ? `<div class="related-section"><div class="related-label">Connected</div>${related}</div>`
+        : "";
+
+      return `<div class="surface-card" id="sc-${c.id}">
+        <div class="surface-card-top">${badge}${intent}<div>
+          <div class="card-summary">${c.summary}</div>
+          ${url_line}
+        </div></div>
+        ${tags}
+        ${related_section}
+        <div class="surface-actions">
+          <button class="s-btn done" onclick="markDone(${c.id})">Done</button>
+          <button class="s-btn" onclick="skipItem(${c.id})">Skip</button>
+        </div>
+      </div>`;
+    }).join("");
+  }
+
+  async function markDone(id) {
+    await fetch(`/surface/${id}/done`, { method: "POST" });
+    document.getElementById(`sc-${id}`).remove();
+    loadFeed();
+  }
+
+  async function skipItem(id) {
+    await fetch(`/surface/${id}/skip`, { method: "POST" });
+    document.getElementById(`sc-${id}`).remove();
+  }
+
+  loadFeed();
+  checkStatus();
+</script>
+</body>
+</html>

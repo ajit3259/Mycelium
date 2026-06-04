@@ -1,0 +1,8 @@
+fastapi
+uvicorn[standard]
+openai
+httpx
+watchdog
+python-multipart
+aiofiles
+beautifulsoup4
