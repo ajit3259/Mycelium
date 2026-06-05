@@ -68,11 +68,12 @@ export function GraphView({ onPick }: Props) {
       return n
     })
 
-    // Build links (deduplicated)
+    // Build links (deduplicated) — coerce IDs to Number since DB may return strings
     const seen = new Set<string>()
     const links: Link[] = []
     for (const c of captures) {
-      for (const rid of (c.related_ids ?? [])) {
+      for (const rawId of (c.related_ids ?? [])) {
+        const rid = Number(rawId)
         const key = [Math.min(c.id, rid), Math.max(c.id, rid)].join('-')
         if (!seen.has(key) && nodeById.has(rid)) {
           seen.add(key)

@@ -118,7 +118,7 @@ export default function App() {
             <CaptureBar onCapture={handleCapture} />
           </div>
           <div style={{ flexShrink: 0 }}>
-            <SurfacePanel pinnedCapture={pinnedCapture} />
+            <SurfacePanel pinnedCapture={pinnedCapture} onPick={handlePick} />
           </div>
         </aside>
 

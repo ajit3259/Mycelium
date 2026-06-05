@@ -5,9 +5,10 @@ import { Card } from './Card'
 
 interface Props {
   pinnedCapture?: Capture | null
+  onPick?: (c: Capture) => void
 }
 
-export function SurfacePanel({ pinnedCapture }: Props) {
+export function SurfacePanel({ pinnedCapture, onPick }: Props) {
   const [queue, setQueue] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
   const [activeMode, setActiveMode] = useState<SurfaceMode | null>(null)
@@ -86,7 +87,7 @@ export function SurfacePanel({ pinnedCapture }: Props) {
               {remaining} remaining
             </p>
           )}
-          <Card key={current.id} capture={current} variant="surface" onAction={advance} />
+          <Card key={current.id} capture={current} variant="surface" onAction={advance} onPick={onPick} />
         </div>
       )}
 
