@@ -5,7 +5,7 @@ from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, BackgroundTasks, Form, UploadFile, File
+from fastapi import FastAPI, BackgroundTasks, Form, UploadFile, File, Request
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
 
@@ -40,12 +40,16 @@ async def capture_link(background_tasks: BackgroundTasks, url: str = Form(...)):
 
 
 @app.post("/capture/image")
-async def capture_image(background_tasks: BackgroundTasks, file: UploadFile = File(...)):
+async def capture_image(
+    background_tasks: BackgroundTasks,
+    file: UploadFile = File(...),
+    description: str = Form(""),
+):
     dest = UPLOADS_DIR / file.filename
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    cid = save_capture("image", file_path=str(dest))
-    background_tasks.add_task(_process, cid, "image", file_path=str(dest))
+    cid = save_capture("image", raw=description or None, file_path=str(dest))
+    background_tasks.add_task(_process, cid, "image", file_path=str(dest), description=description)
     return {"id": cid, "status": "captured"}
 
 
@@ -93,6 +97,17 @@ async def surface(mode: str = None, n: int = 3):
     return items
 
 
+@app.post("/events")
+async def log_event(request: Request):
+    data = await request.json()
+    with __import__('sqlite3').connect(DB_PATH) as conn:
+        conn.execute(
+            "INSERT INTO events (capture_id, event, value, created_at) VALUES (?, ?, ?, datetime('now','localtime'))",
+            (data.get("capture_id"), data.get("event"), str(data.get("value", "")))
+        )
+    return {"status": "ok"}
+
+
 @app.post("/surface/{capture_id}/done")
 async def surface_done(capture_id: int):
     mark_done(capture_id)
@@ -118,7 +133,7 @@ async def _process(cid: int, type: str, **kwargs):
             result = await loop.run_in_executor(None, process_link, kwargs["url"], page_text)
 
         elif type == "image":
-            result = await loop.run_in_executor(None, process_image, kwargs["file_path"])
+            result = await loop.run_in_executor(None, process_image, kwargs["file_path"], kwargs.get("description", ""))
 
         else:
             return

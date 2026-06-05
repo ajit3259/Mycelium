@@ -22,6 +22,15 @@ def init_db():
         """)
         # migrate existing DB if intent column is missing
         cols = [r[1] for r in conn.execute("PRAGMA table_info(captures)").fetchall()]
+        conn.execute("""
+            CREATE TABLE IF NOT EXISTS events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                capture_id INTEGER,
+                event TEXT,
+                value TEXT,
+                created_at TEXT DEFAULT (datetime('now', 'localtime'))
+            )
+        """)
         if "intent" not in cols:
             conn.execute("ALTER TABLE captures ADD COLUMN intent TEXT")
         if "last_surfaced_at" not in cols:

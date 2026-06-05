@@ -1,7 +1,9 @@
+import io
 import json
 import math
 import base64
 from openai import OpenAI
+from PIL import Image
 from config import LM_STUDIO_URL, LM_MODEL
 
 EMBED_MODEL = "text-embedding-nomic-embed-text-v1.5"
@@ -110,15 +112,20 @@ def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: 
     return [cid for cid, _ in scored[:top_n]]
 
 
-def process_image(file_path: str) -> dict:
+def process_image(file_path: str, description: str = "") -> dict:
     model = _loaded_model()
     if not model:
         return FALLBACK
     try:
-        with open(file_path, "rb") as f:
-            b64 = base64.b64encode(f.read()).decode()
-        ext = file_path.rsplit(".", 1)[-1].lower()
-        mime = "image/jpeg" if ext in ("jpg", "jpeg") else f"image/{ext}"
+        img = Image.open(file_path).convert("RGB")
+        max_dim = 768
+        if max(img.width, img.height) > max_dim:
+            img.thumbnail((max_dim, max_dim), Image.LANCZOS)
+        buf = io.BytesIO()
+        img.save(buf, format="JPEG", quality=85)
+        b64 = base64.b64encode(buf.getvalue()).decode()
+        mime = "image/jpeg"
+        user_note = f'\nThe user added this note: "{description}"' if description.strip() else ""
         resp = client.chat.completions.create(
             model=model,
             messages=[{
@@ -132,6 +139,7 @@ def process_image(file_path: str) -> dict:
                             "Classify intent as one of: learn, act, reference, ephemeral.\n"
                             "  learn = knowledge worth reinforcing | act = something to do/follow-up "
                             "| reference = useful to look up | ephemeral = fun/transient\n"
+                            f"{user_note}\n"
                             'Reply ONLY with valid JSON: {"summary": "...", "tags": ["..."], "intent": "learn"}.'
                         ),
                     },

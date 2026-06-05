@@ -6,3 +6,4 @@ watchdog
 python-multipart
 aiofiles
 beautifulsoup4
+pillow
