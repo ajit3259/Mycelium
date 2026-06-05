@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Capture } from '../types'
 import { markDone, markSkip, logEvent } from '../api'
+import { ConnectionGraph } from './ConnectionGraph'
 
 const INTENT_BG: Record<string, string> = {
   learn:     'var(--learn)',
@@ -28,29 +29,6 @@ function Badge({ label, bg }: { label: string; bg: string }) {
   )
 }
 
-function RelatedCard({ capture }: { capture: Capture }) {
-  const intentBg = (capture.intent ? INTENT_BG[capture.intent] : null) ?? '#ccc'
-  return (
-    <div style={{ borderLeft: `4px solid ${intentBg}`, paddingLeft: 12, paddingTop: 8, paddingBottom: 8, background: 'var(--paper)' }}>
-      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 6 }}>
-        {capture.type && <Badge label={TYPE_LABEL[capture.type] ?? capture.type} bg="var(--card)" />}
-        {capture.intent && <Badge label={INTENT_LABEL[capture.intent] ?? capture.intent} bg={INTENT_BG[capture.intent] ?? '#eee'} />}
-      </div>
-      <p style={{ fontSize: 13, lineHeight: 1.4, color: 'var(--ink-soft)', margin: 0 }}>
-        {capture.summary ?? capture.raw ?? '—'}
-      </p>
-      {capture.tags?.length > 0 && (
-        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
-          {capture.tags.map(t => (
-            <span key={t} className="font-mono" style={{ fontSize: 10, padding: '2px 7px', border: '2px solid var(--line)', background: 'var(--paper)', borderRadius: 999, color: 'var(--ink-soft)' }}>
-              {t}
-            </span>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface CardProps {
   capture: Capture
@@ -160,15 +138,13 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
           </div>
         )}
 
-        {/* Connected */}
+        {/* Connected — graph visualization */}
         {variant === 'surface' && capture.related && capture.related.length > 0 && (
-          <div style={{ borderTop: 'var(--bw) solid var(--line)', marginTop: 14 }}>
-            <p className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', padding: '10px 0 0' }}>
+          <div style={{ borderTop: 'var(--bw) solid var(--line)', marginTop: 14, background: 'var(--paper)', margin: '14px -15px -14px' }}>
+            <p className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', padding: '10px 16px 0' }}>
               ◇ Connected · {capture.related.length}
             </p>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, marginTop: 8 }}>
-              {capture.related.map(r => <RelatedCard key={r.id} capture={r} />)}
-            </div>
+            <ConnectionGraph item={capture} onPick={onPick} />
           </div>
         )}
 

@@ -5,8 +5,9 @@ import { CaptureBar } from './components/CaptureBar'
 import { SurfacePanel } from './components/SurfacePanel'
 import { Feed } from './components/Feed'
 import { Browse } from './components/Browse'
+import { GraphView } from './components/GraphView'
 
-type View = 'feed' | 'browse'
+type View = 'feed' | 'browse' | 'graph'
 
 function Spore({ size = 40 }: { size?: number }) {
   return (
@@ -65,6 +66,21 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-3">
+          {/* Graph view toggle */}
+          <button
+            onClick={() => setView(v => v === 'graph' ? 'feed' : 'graph')}
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1 border-2 border-[var(--line)] inline-flex items-center gap-2 transition-all duration-100"
+            style={{
+              background: view === 'graph' ? 'var(--ink)' : 'var(--card)',
+              color: view === 'graph' ? 'var(--paper)' : 'var(--ink)',
+              boxShadow: view === 'graph' ? 'var(--shadow-sm)' : '2px 2px 0 var(--line)',
+              transform: view === 'graph' ? 'translate(-1px,-1px)' : '',
+              cursor: 'pointer',
+            }}
+          >
+            ⬡ graph
+          </button>
+
           {/* Captures badge — clickable, opens Browse */}
           <button
             onClick={() => setView(v => v === 'browse' ? 'feed' : 'browse')}
@@ -111,17 +127,28 @@ export default function App() {
           className="md:overflow-y-auto"
           style={{ padding: 22, height: 'calc(100vh - 89px)' }}
         >
-          {view === 'feed' ? (
+          {view === 'feed' && (
             <Feed
               refreshTrigger={refreshTrigger}
               onCountChange={setTotalCount}
               onPick={handlePick}
             />
-          ) : (
+          )}
+          {view === 'browse' && (
             <Browse onCountChange={setTotalCount} onPick={handlePick} />
+          )}
+          {view === 'graph' && (
+            <GraphView onPick={handlePick} />
           )}
         </main>
 
+      </div>
+      {/* Footer */}
+      <div
+        className="font-mono border-t-2 border-[var(--line)] text-center flex-shrink-0"
+        style={{ padding: '8px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', background: 'var(--paper)' }}
+      >
+        Made with ♥ by Ajit &amp; Claude Code
       </div>
     </div>
   )
