@@ -99,6 +99,21 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
           )}
         </div>
 
+        {/* Image thumbnail */}
+        {capture.type === 'image' && capture.file_path && (
+          <div style={{ marginBottom: 10, overflow: 'hidden', border: 'var(--bw) solid var(--line)' }}>
+            <img
+              src={`/uploads/${capture.file_path.split('/').pop()}`}
+              alt={capture.summary ?? 'image capture'}
+              style={{
+                display: 'block', width: '100%',
+                height: variant === 'surface' ? 180 : 90,
+                objectFit: 'cover', objectPosition: 'top',
+              }}
+            />
+          </div>
+        )}
+
         {/* Summary */}
         {capture.summary ? (
           <p style={{ margin: 0, fontSize: variant === 'surface' ? 19 : 16, lineHeight: 1.4, fontWeight: 500 }}>
@@ -110,18 +125,30 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
           </p>
         )}
 
-        {/* Source URL */}
-        {capture.source_url && (
-          <a
-            href={capture.source_url}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="font-mono"
-            style={{ display: 'block', marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--ref)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}
-          >
-            ↗ {capture.source_url}
-          </a>
-        )}
+        {/* Source URL with favicon */}
+        {capture.source_url && (() => {
+          let domain = ''
+          try { domain = new URL(capture.source_url).hostname } catch {}
+          return (
+            <a
+              href={capture.source_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono"
+              style={{ display: 'flex', alignItems: 'center', gap: 5, marginTop: 8, fontSize: 11.5, fontWeight: 700, color: 'var(--ref)', overflow: 'hidden', textDecoration: 'none' }}
+            >
+              {domain && (
+                <img
+                  src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`}
+                  width={13} height={13}
+                  style={{ flexShrink: 0, border: '1px solid var(--line)' }}
+                  alt=""
+                />
+              )}
+              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {capture.source_url}</span>
+            </a>
+          )
+        })()}
 
         {/* Tags */}
         {capture.tags?.length > 0 && (
@@ -142,7 +169,7 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
         {variant === 'surface' && capture.related && capture.related.length > 0 && (
           <div style={{ borderTop: 'var(--bw) solid var(--line)', marginTop: 14, background: 'var(--paper)', margin: '14px -15px -14px' }}>
             <p className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', padding: '10px 16px 0' }}>
-              ◇ Connected · {capture.related.length}
+              ◇ Connected · {capture.related_ids?.length ?? capture.related.length}
             </p>
             <ConnectionGraph item={capture} onPick={onPick} />
           </div>

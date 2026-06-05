@@ -96,11 +96,10 @@ def _cosine(a, b):
     return dot / mag if mag else 0.0
 
 
+SIMILARITY_THRESHOLD = 0.70
+
 def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: int = 3) -> list:
-    """
-    Given an embedding and a list of (id, embedding) pairs,
-    return the top_n most similar capture IDs (excluding self).
-    """
+    """Return top_n most similar capture IDs above the similarity threshold."""
     if not embedding or not all_embeddings:
         return []
     scored = [
@@ -109,7 +108,7 @@ def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: 
         if cid != exclude_id
     ]
     scored.sort(key=lambda x: x[1], reverse=True)
-    return [cid for cid, _ in scored[:top_n]]
+    return [cid for cid, score in scored[:top_n] if score >= SIMILARITY_THRESHOLD]
 
 
 def process_image(file_path: str, description: str = "") -> dict:

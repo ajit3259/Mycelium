@@ -13,17 +13,21 @@ interface Props {
 }
 
 export function ConnectionGraph({ item, onPick }: Props) {
-  const related = (item.related ?? []).slice(0, 5)
+  const related = (item.related ?? []).slice(0, 3)
   if (related.length === 0) return null
 
-  const W = 380, H = 170
-  const cx = 64, cy = H / 2
-  const R = 120
+  // Total connections from DB — related_ids is the authoritative count
+  const totalConnected = item.related_ids?.length ?? item.related?.length ?? 0
+  const extra = totalConnected - related.length
+
+  const W = 380, H = 190
+  const cx = 56, cy = 88  // center node position
+  const R = 100             // spoke length — shorter keeps labels in bounds
   const n = related.length
 
   const angleFor = (i: number) => {
     if (n === 1) return 0
-    const span = Math.min(100, 40 * (n - 1))
+    const span = Math.min(70, 35 * (n - 1)) // tighter spread → labels stay in-box
     return ((-span / 2) + (span / (n - 1)) * i) * (Math.PI / 180)
   }
 
@@ -38,7 +42,7 @@ export function ConnectionGraph({ item, onPick }: Props) {
     <svg
       viewBox={`0 0 ${W} ${H}`}
       width="100%"
-      style={{ display: 'block', overflow: 'visible' }}
+      style={{ display: 'block', overflow: 'hidden' }}
     >
       {/* Lines */}
       {nodes.map((nd, i) => (
@@ -70,27 +74,36 @@ export function ConnectionGraph({ item, onPick }: Props) {
               strokeWidth="2.5"
             />
             <text
-              x={nd.x} y={nd.y + 29}
+              x={nd.x} y={nd.y + 27}
               textAnchor="middle"
               fontFamily="JetBrains Mono, monospace"
               fontSize="9"
               fontWeight="700"
               fill="var(--ink-soft)"
             >
-              {tag.length > 12 ? tag.slice(0, 11) + '…' : tag}
+              {tag.length > 14 ? tag.slice(0, 13) + '…' : tag}
             </text>
           </g>
         )
       })}
 
       {/* Central node */}
-      <circle
-        cx={cx} cy={cy} r={22}
-        fill={centerBg}
-        stroke="var(--ink)"
-        strokeWidth="3"
-      />
+      <circle cx={cx} cy={cy} r={22} fill={centerBg} stroke="var(--ink)" strokeWidth="3" />
       <circle cx={cx} cy={cy} r={7} fill="var(--ink)" />
+
+      {/* "· N more" — anchored to center, only when DB has more than shown */}
+      {extra > 0 && (
+        <text
+          x={cx} y={cy + 37}
+          textAnchor="middle"
+          fontFamily="JetBrains Mono, monospace"
+          fontSize="9"
+          fontWeight="700"
+          fill="var(--ink-soft)"
+        >
+          · {extra} more
+        </text>
+      )}
     </svg>
   )
 }

@@ -11,6 +11,7 @@ export default defineConfig({
       '/capture': 'http://localhost:8000',
       '/surface': 'http://localhost:8000',
       '/events': 'http://localhost:8000',
+      '/uploads': 'http://localhost:8000',
     },
   },
   build: {

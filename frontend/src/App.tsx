@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useCallback } from 'react'
 import type { Capture } from './types'
 import { getCaptureRelated } from './api'
 import { CaptureBar } from './components/CaptureBar'
@@ -31,13 +31,12 @@ export default function App() {
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [pinnedCapture, setPinnedCapture] = useState<Capture | null>(null)
 
-  async function handlePick(c: Capture) {
-    // Hydrate related captures if not already present
+  const handlePick = useCallback(async (c: Capture) => {
     const related = c.related ?? await getCaptureRelated(c.id).catch(() => [])
     const hydrated = { ...c, related }
     setPinnedCapture(hydrated)
     setTimeout(() => setPinnedCapture(null), 100)
-  }
+  }, [])
 
   function handleCapture() {
     setRefreshTrigger(n => n + 1)

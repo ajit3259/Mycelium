@@ -92,7 +92,7 @@ export function SurfacePanel({ pinnedCapture, onPick }: Props) {
       )}
 
       {!loading && activeMode !== null && !current && (
-        <div className="border-2 border-dashed border-[var(--line)] py-8 text-center" style={{ opacity: 0.4 }}>
+        <div className="border-2 border-dashed border-[var(--line)] py-8 text-center" style={{ opacity: 0.6 }}>
           <p className="font-mono text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--ink)' }}>
             All clear ✦
           </p>

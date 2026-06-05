@@ -5,9 +5,9 @@ from pathlib import Path
 
 import httpx
 from bs4 import BeautifulSoup
-from fastapi import FastAPI, BackgroundTasks, Form, UploadFile, File, Request
+from fastapi import FastAPI, BackgroundTasks, Form, UploadFile, File, Request, HTTPException
 from fastapi.staticfiles import StaticFiles
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, FileResponse
 
 from config import UPLOADS_DIR
 from db import init_db, save_capture, update_capture, get_captures, get_surfaceable, mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids
@@ -51,6 +51,16 @@ async def capture_image(
     cid = save_capture("image", raw=description or None, file_path=str(dest))
     background_tasks.add_task(_process, cid, "image", file_path=str(dest), description=description)
     return {"id": cid, "status": "captured"}
+
+
+# ── uploads ───────────────────────────────────────────────────────────────────
+
+@app.get("/uploads/{filename:path}")
+async def serve_upload(filename: str):
+    path = UPLOADS_DIR / filename
+    if not path.exists():
+        raise HTTPException(status_code=404)
+    return FileResponse(path)
 
 
 # ── read endpoints ─────────────────────────────────────────────────────────────

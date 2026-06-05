@@ -103,6 +103,7 @@ def get_captures(limit=50):
         for r in rows:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
+            d["related_ids"] = json.loads(d.get("related_ids") or "[]")
             result.append(d)
         return result
 

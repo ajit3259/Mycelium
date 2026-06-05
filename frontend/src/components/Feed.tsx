@@ -40,12 +40,12 @@ export function Feed({ refreshTrigger, onCountChange, onPick }: Props) {
           </span>
           <button
             onClick={load} disabled={loading}
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.1em] px-3 py-1.5 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-40 hover:-translate-x-px hover:-translate-y-px"
+            className="font-mono text-[13px] font-bold uppercase tracking-[0.1em] px-4 py-2 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-40"
             style={{ background: 'var(--card)', color: 'var(--ink)', boxShadow: 'var(--shadow-sm)' }}
-            onMouseEnter={e => (e.currentTarget.style.boxShadow = 'var(--shadow)')}
-            onMouseLeave={e => (e.currentTarget.style.boxShadow = 'var(--shadow-sm)')}
+            onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'translate(-1px,-1px)' }}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = '' }}
           >
-            {loading ? '…' : '↻'}
+            {loading ? '…' : '↻ refresh'}
           </button>
         </div>
       </div>
