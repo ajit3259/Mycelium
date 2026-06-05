@@ -1,0 +1,59 @@
+@import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap');
+@import "tailwindcss";
+
+:root {
+  --paper:    #f3ead4;
+  --card:     #fffdf6;
+  --ink:      #181410;
+  --ink-soft: #5b5347;
+  --line:     #181410;
+
+  --learn: #ffd23f;
+  --act:   #ff5c39;
+  --ref:   #3a86ff;
+  --eph:   #b9a7ff;
+  --done:  #2ec27e;
+
+  --bw: 3px;
+  --shadow-sm: 3px 3px 0 var(--line);
+  --shadow:    5px 5px 0 var(--line);
+  --shadow-lg: 8px 8px 0 var(--line);
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  background-color: var(--paper);
+  color: var(--ink);
+  font-family: "Space Grotesk", system-ui, sans-serif;
+  min-height: 100vh;
+  background-image: radial-gradient(var(--line) 0.9px, transparent 0.9px);
+  background-size: 26px 26px;
+  background-position: -13px -13px;
+  -webkit-font-smoothing: antialiased;
+}
+
+#root { min-height: 100vh; }
+
+.font-mono {
+  font-family: "JetBrains Mono", "Courier New", monospace !important;
+}
+
+::selection { background: var(--learn); color: var(--ink); }
+
+::-webkit-scrollbar { width: 12px; }
+::-webkit-scrollbar-track { background: var(--paper); border-left: 3px solid var(--line); }
+::-webkit-scrollbar-thumb { background: var(--ink); border: 3px solid var(--paper); }
+
+textarea, input, select { font-family: "Space Grotesk", system-ui, sans-serif; }
+
+@keyframes pop-in {
+  from { opacity: 0; transform: translateY(-8px) scale(.98); }
+  to   { opacity: 1; transform: none; }
+}
+
+@keyframes stamp {
+  0%   { opacity: 0; transform: rotate(-14deg) scale(2.2); }
+  60%  { opacity: 1; transform: rotate(-14deg) scale(.92); }
+  100% { transform: rotate(-14deg) scale(1); }
+}
