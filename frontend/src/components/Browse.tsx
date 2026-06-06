@@ -26,12 +26,15 @@ interface Props {
   onPick?: (c: Capture) => void
 }
 
+const PAGE_SIZE = 10
+
 export function Browse({ onCountChange, onPick }: Props) {
   const [all, setAll] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
   const [query, setQuery] = useState('')
   const [intent, setIntent] = useState<IntentFilter>('all')
   const [type, setType] = useState<TypeFilter>('all')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     setLoading(true)
@@ -53,6 +56,12 @@ export function Browse({ onCountChange, onPick }: Props) {
       return true
     })
   }, [all, intent, type, query])
+
+  // Reset to page 1 whenever filters change
+  useEffect(() => { setPage(1) }, [intent, type, query])
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE))
+  const paginated = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE)
 
   function Chip({ label, active, bg, onClick }: { label: string; active: boolean; bg?: string; onClick: () => void }) {
     return (
@@ -137,8 +146,39 @@ export function Browse({ onCountChange, onPick }: Props) {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {filtered.map(c => <Card key={c.id} capture={c} variant="feed" onPick={onPick} />)}
+        {paginated.map(c => <Card key={c.id} capture={c} variant="feed" onPick={onPick} />)}
       </div>
+
+      {/* Pagination */}
+      {totalPages > 1 && (
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 20, gap: 12 }}>
+          <button
+            onClick={() => setPage(p => Math.max(1, p - 1))}
+            disabled={page === 1}
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-4 py-2 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-30"
+            style={{ background: 'var(--card)', color: 'var(--ink)', boxShadow: 'var(--shadow-sm)', cursor: page === 1 ? 'default' : 'pointer' }}
+            onMouseEnter={e => { if (page > 1) { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'translate(-1px,-1px)' }}}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = '' }}
+          >
+            ← prev
+          </button>
+
+          <span className="font-mono" style={{ fontSize: 11, fontWeight: 700, color: 'var(--ink-soft)', letterSpacing: '0.1em' }}>
+            {page} / {totalPages}
+          </span>
+
+          <button
+            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            disabled={page === totalPages}
+            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-4 py-2 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-30"
+            style={{ background: 'var(--card)', color: 'var(--ink)', boxShadow: 'var(--shadow-sm)', cursor: page === totalPages ? 'default' : 'pointer' }}
+            onMouseEnter={e => { if (page < totalPages) { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'translate(-1px,-1px)' }}}
+            onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = '' }}
+          >
+            next →
+          </button>
+        </div>
+      )}
     </div>
   )
 }
