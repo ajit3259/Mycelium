@@ -1,5 +1,4 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
-import type { Mood } from '../types'
 import { captureText, captureLink, captureImage } from '../api'
 
 type Tab = 'note' | 'link' | 'image'
@@ -8,86 +7,12 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'link',  label: 'LINK' },
   { id: 'image', label: 'IMAGE' },
 ]
-const MOODS: Mood[] = ['focused', 'curious', 'restless', 'tired', 'inspired']
-
-function MoodPicker({ value, onChange }: { value: Mood | ''; onChange: (m: Mood | '') => void }) {
-  const [open, setOpen] = useState(false)
-  const ref = useRef<HTMLDivElement>(null)
-
-  useEffect(() => {
-    function close(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
-    }
-    document.addEventListener('mousedown', close)
-    return () => document.removeEventListener('mousedown', close)
-  }, [])
-
-  const label = value ? value.toUpperCase() : 'MOOD ▾'
-
-  return (
-    <div ref={ref} style={{ position: 'relative', flex: 1 }}>
-      <button
-        type="button"
-        onClick={() => setOpen(o => !o)}
-        className="font-mono w-full h-full text-[12px] font-bold tracking-[0.1em] border-none outline-none cursor-pointer py-3"
-        style={{
-          background: value ? 'var(--eph)' : 'var(--card)',
-          color: 'var(--ink)',
-          display: 'block',
-        }}
-      >
-        {label}
-      </button>
-
-      {open && (
-        <div
-          style={{
-            position: 'absolute', top: '100%', right: 0, zIndex: 50, minWidth: 120,
-            background: 'var(--card)', border: '2px solid var(--line)',
-            boxShadow: 'var(--shadow)', marginTop: 2,
-          }}
-        >
-          {value && (
-            <button
-              type="button"
-              onClick={() => { onChange(''); setOpen(false) }}
-              className="font-mono w-full text-left text-[11px] font-bold uppercase tracking-[0.08em] px-4 py-2.5 border-b-2 border-[var(--line)]"
-              style={{ background: 'var(--paper)', color: 'var(--ink-soft)' }}
-            >
-              Clear
-            </button>
-          )}
-          {MOODS.map(m => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => { onChange(m); setOpen(false) }}
-              className="font-mono w-full text-left text-[12px] font-bold uppercase tracking-[0.08em] px-4 py-2.5"
-              style={{
-                background: value === m ? 'var(--eph)' : 'var(--card)',
-                color: 'var(--ink)',
-                borderBottom: '1px solid var(--line)',
-                display: 'block',
-              }}
-              onMouseEnter={e => (e.currentTarget.style.background = 'var(--paper)')}
-              onMouseLeave={e => (e.currentTarget.style.background = value === m ? 'var(--eph)' : 'var(--card)')}
-            >
-              {m}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
 
 interface Props {
   onCapture: (id: number) => void
-  mood: Mood | ''
-  onMoodChange: (m: Mood | '') => void
 }
 
-export function CaptureBar({ onCapture, mood, onMoodChange }: Props) {
+export function CaptureBar({ onCapture }: Props) {
   const [tab, setTab] = useState<Tab>('note')
   const [note, setNote] = useState('')
   const [link, setLink] = useState('')
@@ -157,10 +82,6 @@ export function CaptureBar({ onCapture, mood, onMoodChange }: Props) {
             {t.label}
           </button>
         ))}
-        {/* Mood selector — custom to avoid OS native dropdown */}
-        <div className="flex-1 border-l-2 border-[var(--line)]">
-          <MoodPicker value={mood} onChange={onMoodChange} />
-        </div>
       </div>
 
       {/* Input area */}

@@ -13,6 +13,44 @@ import { ReviewScreen } from './components/ReviewScreen'
 import { AskScreen } from './components/AskScreen'
 import { BriefScreen } from './components/BriefScreen'
 
+const MOODS: Mood[] = ['focused', 'curious', 'restless', 'tired', 'inspired']
+
+const MOOD_EMOJI: Record<Mood, string> = {
+  focused:  '🎯',
+  curious:  '🔭',
+  restless: '⚡',
+  tired:    '🌙',
+  inspired: '✨',
+}
+
+function MoodPill({ mood, onChange }: { mood: Mood | ''; onChange: (m: Mood | '') => void }) {
+  function cycle() {
+    if (!mood) { onChange(MOODS[0]); return }
+    const idx = MOODS.indexOf(mood)
+    const next = MOODS[idx + 1]
+    onChange(next ?? '')
+  }
+
+  return (
+    <button
+      onClick={cycle}
+      title={mood ? `Mood: ${mood} — click to change` : 'Set mood'}
+      className="font-mono"
+      style={{
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+        padding: '3px 8px', border: '2.5px solid var(--line)',
+        background: mood ? 'var(--ink)' : 'var(--card)',
+        color: mood ? 'var(--paper)' : 'var(--ink-soft)',
+        boxShadow: mood ? 'none' : '2px 2px 0 var(--line)',
+        cursor: 'pointer', transition: 'background 0.15s',
+      }}
+    >
+      {mood ? <>{MOOD_EMOJI[mood]} {mood}</> : '— mood'}
+    </button>
+  )
+}
+
 function Spore({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" style={{ display: 'block', flexShrink: 0 }}>
@@ -122,6 +160,10 @@ export default function App() {
               {totalCount} CAPTURES
             </span>
           )}
+
+          {/* Mood indicator — click to cycle, click active to clear */}
+          <MoodPill mood={mood} onChange={setMood} />
+
           <span className="font-mono" style={{
             display: 'inline-flex', alignItems: 'center', gap: 6,
             fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
@@ -151,7 +193,7 @@ export default function App() {
               padding: 22, overflowY: 'auto',
             }}>
               <div style={{ flexShrink: 0 }}>
-                <CaptureBar onCapture={handleCapture} mood={mood} onMoodChange={setMood} />
+                <CaptureBar onCapture={handleCapture} />
               </div>
               {pendingGuess && (
                 <div style={{ flexShrink: 0 }}>
