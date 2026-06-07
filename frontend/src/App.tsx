@@ -15,39 +15,92 @@ import { BriefScreen } from './components/BriefScreen'
 
 const MOODS: Mood[] = ['focused', 'curious', 'restless', 'tired', 'inspired']
 
-const MOOD_EMOJI: Record<Mood, string> = {
-  focused:  '🎯',
-  curious:  '🔭',
-  restless: '⚡',
-  tired:    '🌙',
-  inspired: '✨',
+const MOOD_META: Record<Mood, { emoji: string; hint: string }> = {
+  focused:  { emoji: '🎯', hint: 'Tasks & action items' },
+  curious:  { emoji: '🔭', hint: 'Deep learning mode' },
+  restless: { emoji: '⚡', hint: 'Browse & variety' },
+  tired:    { emoji: '🌙', hint: 'Light content only' },
+  inspired: { emoji: '✨', hint: 'Learn & create' },
 }
 
 function MoodPill({ mood, onChange }: { mood: Mood | ''; onChange: (m: Mood | '') => void }) {
-  function cycle() {
-    if (!mood) { onChange(MOODS[0]); return }
-    const idx = MOODS.indexOf(mood)
-    const next = MOODS[idx + 1]
-    onChange(next ?? '')
+  const [open, setOpen] = useState(false)
+  const ref = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function close(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
+    }
+    document.addEventListener('mousedown', close)
+    return () => document.removeEventListener('mousedown', close)
+  }, [])
+
+  function select(m: Mood | '') {
+    onChange(m)
+    setOpen(false)
   }
 
   return (
-    <button
-      onClick={cycle}
-      title={mood ? `Mood: ${mood} — click to change` : 'Set mood'}
-      className="font-mono"
-      style={{
-        display: 'inline-flex', alignItems: 'center', gap: 6,
-        fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
-        padding: '3px 8px', border: '2.5px solid var(--line)',
-        background: mood ? 'var(--ink)' : 'var(--card)',
-        color: mood ? 'var(--paper)' : 'var(--ink-soft)',
-        boxShadow: mood ? 'none' : '2px 2px 0 var(--line)',
-        cursor: 'pointer', transition: 'background 0.15s',
-      }}
-    >
-      {mood ? <>{MOOD_EMOJI[mood]} {mood}</> : '— mood'}
-    </button>
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button
+        onClick={() => setOpen(o => !o)}
+        className="font-mono"
+        style={{
+          display: 'inline-flex', alignItems: 'center', gap: 6,
+          fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+          padding: '3px 8px', border: '2.5px solid var(--line)',
+          background: mood ? 'var(--ink)' : 'var(--card)',
+          color: mood ? 'var(--paper)' : 'var(--ink-soft)',
+          boxShadow: mood ? 'none' : '2px 2px 0 var(--line)',
+          cursor: 'pointer',
+        }}
+      >
+        {mood ? <>{MOOD_META[mood].emoji} {mood}</> : '— mood ▾'}
+      </button>
+
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', right: 0, zIndex: 100,
+          background: 'var(--card)', border: '2.5px solid var(--line)',
+          boxShadow: 'var(--shadow)', minWidth: 200,
+        }}>
+          {MOODS.map(m => (
+            <button
+              key={m}
+              onClick={() => select(m)}
+              className="font-mono"
+              style={{
+                width: '100%', display: 'flex', alignItems: 'center', gap: 10,
+                padding: '9px 14px', border: 'none', borderBottom: '1px solid var(--line)',
+                background: mood === m ? 'var(--ink)' : 'var(--card)',
+                color: mood === m ? 'var(--paper)' : 'var(--ink)',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+              onMouseEnter={e => { if (mood !== m) e.currentTarget.style.background = 'var(--paper)' }}
+              onMouseLeave={e => { if (mood !== m) e.currentTarget.style.background = 'var(--card)' }}
+            >
+              <span style={{ fontSize: 14 }}>{MOOD_META[m].emoji}</span>
+              <span>
+                <span style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', display: 'block' }}>{m}</span>
+                <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: '0.04em', opacity: 0.6, textTransform: 'none' }}>{MOOD_META[m].hint}</span>
+              </span>
+            </button>
+          ))}
+          {mood && (
+            <button
+              onClick={() => select('')}
+              className="font-mono"
+              style={{
+                width: '100%', padding: '8px 14px', border: 'none',
+                background: 'var(--paper)', color: 'var(--ink-soft)',
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                cursor: 'pointer', textAlign: 'left',
+              }}
+            >✕ Clear mood</button>
+          )}
+        </div>
+      )}
+    </div>
   )
 }
 
