@@ -59,7 +59,15 @@ export function Feed({ refreshTrigger, onCountChange, onPick }: Props) {
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-        {captures.map(c => <Card key={c.id} capture={c} variant="feed" onPick={onPick} />)}
+        {captures.map(c => (
+          <Card
+            key={c.id}
+            capture={c}
+            variant="feed"
+            onPick={onPick}
+            onDelete={id => setCaptures(prev => prev.filter(x => x.id !== id))}
+          />
+        ))}
       </div>
     </div>
   )

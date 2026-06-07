@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Capture } from '../types'
-import { markDone, markSkip, logEvent } from '../api'
+import { markDone, markSkip, logEvent, deleteCapture } from '../api'
 import { ConnectionGraph } from './ConnectionGraph'
 
 const INTENT_BG: Record<string, string> = {
@@ -35,11 +35,14 @@ interface CardProps {
   variant: 'feed' | 'surface'
   onAction?: () => void
   onPick?: (c: Capture) => void
+  onDelete?: (id: number) => void
 }
 
-export function Card({ capture, variant, onAction, onPick }: CardProps) {
+export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps) {
   const dwellStart = useRef<number>(Date.now())
   const [stamping, setStamping] = useState(false)
+
+  const isProcessing = !capture.summary
 
   useEffect(() => { dwellStart.current = Date.now() }, [capture.id])
 
@@ -60,6 +63,12 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
     onAction?.()
   }
 
+  async function handleDismiss(e: React.MouseEvent) {
+    e.stopPropagation()
+    await deleteCapture(capture.id)
+    onDelete?.(capture.id)
+  }
+
   const intentBg = (capture.intent ? INTENT_BG[capture.intent] : null) ?? '#eee'
 
   // Reference-matched padding: feed = 13px 15px, surface = 18px 18px 14px
@@ -76,9 +85,9 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
         background: 'var(--card)',
         boxShadow: 'var(--shadow-sm)',
         transition: 'transform .08s, box-shadow .08s',
-        cursor: variant === 'feed' && onPick ? 'pointer' : 'default',
+        cursor: variant === 'feed' && onPick && !isProcessing ? 'pointer' : 'default',
       }}
-      onClick={variant === 'feed' && onPick ? () => onPick(capture) : undefined}
+      onClick={variant === 'feed' && onPick && !isProcessing ? () => onPick(capture) : undefined}
       onMouseEnter={e => { e.currentTarget.style.boxShadow = 'var(--shadow)'; e.currentTarget.style.transform = 'translate(-2px,-2px)' }}
       onMouseLeave={e => { e.currentTarget.style.boxShadow = 'var(--shadow-sm)'; e.currentTarget.style.transform = '' }}
     >
@@ -114,15 +123,34 @@ export function Card({ capture, variant, onAction, onPick }: CardProps) {
           </div>
         )}
 
-        {/* Summary */}
+        {/* Summary or processing state */}
         {capture.summary ? (
           <p style={{ margin: 0, fontSize: variant === 'surface' ? 19 : 16, lineHeight: 1.4, fontWeight: 500 }}>
             {capture.summary}
           </p>
         ) : (
-          <p className="font-mono" style={{ margin: 0, fontSize: 14, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
-            processing…
-          </p>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+            <div style={{ minWidth: 0 }}>
+              <p className="font-mono" style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>
+                ◌ Processing…
+              </p>
+              {(capture.raw || capture.source_url) && (
+                <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.4, overflow: 'hidden', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                  {(capture.raw || capture.source_url)!.slice(0, 120)}
+                </p>
+              )}
+            </div>
+            {variant === 'feed' && onDelete && (
+              <button
+                onClick={handleDismiss}
+                title="Dismiss"
+                className="font-mono"
+                style={{ flexShrink: 0, fontSize: 14, lineHeight: 1, padding: '2px 6px', border: '2px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-soft)', cursor: 'pointer' }}
+              >
+                ×
+              </button>
+            )}
+          </div>
         )}
 
         {/* Source URL with favicon */}

@@ -10,7 +10,7 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 
 from config import UPLOADS_DIR
-from db import init_db, save_capture, update_capture, get_captures, get_surfaceable, mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids
+from db import init_db, save_capture, update_capture, get_captures, get_surfaceable, mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids, delete_capture
 from lm import process_text, process_link, process_image, embed, find_related
 from surface import pick
 
@@ -92,6 +92,12 @@ async def related_captures(capture_id: int):
             d.pop("embedding", None)
             result.append(d)
         return result
+
+
+@app.delete("/captures/{capture_id}")
+async def delete_capture_endpoint(capture_id: int):
+    delete_capture(capture_id)
+    return {"status": "deleted"}
 
 
 # ── surface endpoints ──────────────────────────────────────────────────────────

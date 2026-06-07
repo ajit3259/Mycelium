@@ -56,6 +56,10 @@ export async function markSkip(id: number): Promise<void> {
   await fetch(`/surface/${id}/skip`, { method: 'POST' })
 }
 
+export async function deleteCapture(id: number): Promise<void> {
+  await fetch(`/captures/${id}`, { method: 'DELETE' })
+}
+
 export async function logEvent(event: LogEvent): Promise<void> {
   await post('/events', JSON.stringify(event), true).catch(() => {})
 }

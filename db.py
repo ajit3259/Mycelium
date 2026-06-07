@@ -65,6 +65,11 @@ def update_capture(capture_id, summary, tags, intent=None, embedding=None, relat
         )
 
 
+def delete_capture(capture_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.execute("DELETE FROM captures WHERE id=?", (capture_id,))
+
+
 def get_captures_by_ids(ids: list) -> list:
     if not ids:
         return []
