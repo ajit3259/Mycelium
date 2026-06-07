@@ -88,8 +88,21 @@ function ResultRow({ capture, onExpand, expanded, onPick }: {
 
       {/* Expanded full card */}
       {expanded && (
-        <div style={{ borderTop: '1px solid var(--line)', padding: '0 0 2px' }}>
-          <Card capture={capture} variant="feed" onPick={onPick} />
+        <div style={{ borderTop: '1px solid var(--line)' }}>
+          <Card capture={capture} variant="feed" />
+          {onPick && (
+            <div style={{ padding: '0 12px 10px', display: 'flex', justifyContent: 'flex-end' }}>
+              <button
+                onClick={() => onPick(capture)}
+                className="font-mono"
+                style={{
+                  fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  padding: '5px 12px', border: '2px solid var(--line)', background: 'var(--paper)',
+                  color: 'var(--ink)', cursor: 'pointer', boxShadow: '2px 2px 0 var(--line)',
+                }}
+              >Open in home →</button>
+            </div>
+          )}
         </div>
       )}
     </div>
@@ -167,9 +180,10 @@ export function AskScreen({ onPick }: Props) {
   ).slice(0, 8)
 
   const runSynthesize = useCallback(async () => {
-    if (!submitted || !synthCandidates.length) return
+    if (!submitted || !results.length) return
     setSynthesis(s => ({ ...s, loading: true, done: false, error: undefined }))
-    const ids = synthCandidates.map(c => c.id)
+    const candidates = synthCandidates.length > 0 ? synthCandidates : results.slice(0, 5)
+    const ids = candidates.map(c => c.id)
     try {
       const res = await askSynthesize(submitted, ids)
       setSynthesis({ text: res.synthesis, tension: res.tension, loading: false, done: true })
@@ -321,28 +335,43 @@ export function AskScreen({ onPick }: Props) {
                   )}
 
                   {/* Synthesize — right below the compact list */}
-                  {!synthesis.done && !synthesis.loading && (
-                    <button
-                      onClick={runSynthesize}
-                      disabled={synthCandidates.length === 0}
-                      style={{
-                        marginTop: 10, width: '100%',
-                        fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-                        padding: '12px 0', border: 'var(--bw) solid var(--line)',
-                        background: synthCandidates.length === 0 ? 'var(--card)' : 'var(--ink)',
-                        color: synthCandidates.length === 0 ? 'var(--ink-soft)' : 'var(--paper)',
-                        cursor: synthCandidates.length === 0 ? 'not-allowed' : 'pointer',
-                        boxShadow: synthCandidates.length === 0 ? 'none' : 'var(--shadow-sm)',
-                        display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                      }}
-                    >
-                      <span>✦</span>
-                      {synthCandidates.length === 0
-                        ? 'No notes above relevance threshold'
-                        : `Synthesize from ${synthCandidates.length} relevant note${synthCandidates.length !== 1 ? 's' : ''}`
-                      }
-                    </button>
-                  )}
+                  {!synthesis.done && !synthesis.loading && (() => {
+                    const hasStrong = synthCandidates.length > 0
+                    const fallback = results.slice(0, 5)
+                    return (
+                      <div style={{ marginTop: 10 }}>
+                        {!hasStrong && results.length > 0 && (
+                          <div style={{
+                            fontSize: 13, fontWeight: 500,
+                            color: 'var(--ink-soft)', marginBottom: 8,
+                            display: 'flex', alignItems: 'center', gap: 6,
+                          }}>
+                            <span>⚠</span> All matches below {Math.round(SYNTH_THRESHOLD * 100)}% relevance — synthesis may be loosely grounded
+                          </div>
+                        )}
+                        <button
+                          onClick={runSynthesize}
+                          style={{
+                            width: '100%',
+                            fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                            padding: '12px 0',
+                            border: hasStrong ? 'var(--bw) solid var(--line)' : '2px dashed var(--line)',
+                            background: hasStrong ? 'var(--ink)' : 'var(--card)',
+                            color: hasStrong ? 'var(--paper)' : 'var(--ink-soft)',
+                            cursor: 'pointer',
+                            boxShadow: hasStrong ? 'var(--shadow-sm)' : 'none',
+                            display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                          }}
+                        >
+                          <span>✦</span>
+                          {hasStrong
+                            ? `Synthesize from ${synthCandidates.length} relevant note${synthCandidates.length !== 1 ? 's' : ''}`
+                            : `Synthesize anyway from best ${fallback.length} matches`
+                          }
+                        </button>
+                      </div>
+                    )
+                  })()}
                 </>
               )}
             </section>
