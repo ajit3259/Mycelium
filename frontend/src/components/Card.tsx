@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { Capture } from '../types'
 import { markDone, markSkip, logEvent, deleteCapture } from '../api'
 import { ConnectionGraph } from './ConnectionGraph'
+import { ImageThumb } from './ImageThumb'
 
 const INTENT_BG: Record<string, string> = {
   learn:     'var(--learn)',
@@ -110,17 +111,11 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
 
         {/* Image thumbnail */}
         {capture.type === 'image' && capture.file_path && (
-          <div style={{ marginBottom: 10, overflow: 'hidden', border: 'var(--bw) solid var(--line)' }}>
-            <img
-              src={`/uploads/${capture.file_path.split('/').pop()}`}
-              alt={capture.summary ?? 'image capture'}
-              style={{
-                display: 'block', width: '100%',
-                height: variant === 'surface' ? 180 : 90,
-                objectFit: 'cover', objectPosition: 'top',
-              }}
-            />
-          </div>
+          <ImageThumb
+            src={`/uploads/${capture.file_path.split('/').pop()}`}
+            alt={capture.summary ?? 'image capture'}
+            thumbHeight={variant === 'surface' ? 200 : 140}
+          />
         )}
 
         {/* Summary or processing state */}

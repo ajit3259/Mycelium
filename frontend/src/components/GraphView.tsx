@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import type { Capture } from '../types'
 import { getCaptures } from '../api'
+import { ImageThumb } from './ImageThumb'
 import * as d3Force from 'd3-force'
 import * as d3Drag from 'd3-drag'
 import * as d3Zoom from 'd3-zoom'
@@ -275,6 +276,13 @@ export function GraphView({ onPick }: Props) {
 
             {/* body */}
             <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 20px' }}>
+              {selected.capture.type === 'image' && selected.capture.file_path && (
+                <ImageThumb
+                  src={`/uploads/${selected.capture.file_path.split('/').pop()}`}
+                  alt={selected.capture.summary ?? 'image'}
+                  thumbHeight={160}
+                />
+              )}
               <p style={{ margin: '0 0 14px', fontSize: 16, lineHeight: 1.45, fontWeight: 500, color: 'var(--ink)' }}>
                 {selected.capture.summary ?? selected.capture.raw ?? '(processing…)'}
               </p>
