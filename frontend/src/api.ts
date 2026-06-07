@@ -13,6 +13,11 @@ export async function getCaptures(limit = 20): Promise<Capture[]> {
   return r.json()
 }
 
+export async function getCapturesByIntent(intent: string, limit = 50): Promise<Capture[]> {
+  const r = await fetch(`/captures?intent=${encodeURIComponent(intent)}&limit=${limit}`)
+  return r.json()
+}
+
 export async function getCaptureRelated(id: number): Promise<Capture[]> {
   const r = await fetch(`/captures/${id}/related`)
   return r.json()
@@ -62,4 +67,59 @@ export async function deleteCapture(id: number): Promise<void> {
 
 export async function logEvent(event: LogEvent): Promise<void> {
   await post('/events', JSON.stringify(event), true).catch(() => {})
+}
+
+export async function patchCapture(id: number, patch: { intent?: string; tags?: string[] }): Promise<void> {
+  await fetch(`/captures/${id}`, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(patch),
+  })
+}
+
+export async function getReviewQueue(limit = 10): Promise<Capture[]> {
+  const r = await fetch(`/review?limit=${limit}`)
+  return r.json()
+}
+
+export async function postReview(id: number, rating: 'got_it' | 'again'): Promise<void> {
+  await fetch(`/captures/${id}/review`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ rating }),
+  })
+}
+
+export async function searchCaptures(q: string, limit = 20): Promise<Capture[]> {
+  const r = await fetch(`/search?q=${encodeURIComponent(q)}&limit=${limit}`)
+  return r.json()
+}
+
+export async function getBrief(): Promise<Record<string, Capture[]>> {
+  const r = await fetch('/brief')
+  return r.json()
+}
+
+export async function askSynthesize(query: string, capture_ids: number[]): Promise<{ synthesis: string; tension: string | null }> {
+  const r = await fetch('/ask/synthesize', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, capture_ids }),
+  })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  const text = await r.text()
+  if (!text.trim()) throw new Error('Empty response from server')
+  return JSON.parse(text)
+}
+
+export async function askExtend(query: string, synthesis: string): Promise<{ gap: string; questions: string[] }> {
+  const r = await fetch('/ask/extend', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ query, synthesis }),
+  })
+  if (!r.ok) throw new Error(`HTTP ${r.status}`)
+  const text = await r.text()
+  if (!text.trim()) throw new Error('Empty response')
+  return JSON.parse(text)
 }

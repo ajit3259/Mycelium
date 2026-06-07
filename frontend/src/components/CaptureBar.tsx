@@ -8,7 +8,7 @@ const TABS: { id: Tab; label: string }[] = [
   { id: 'link',  label: 'LINK' },
   { id: 'image', label: 'IMAGE' },
 ]
-const MOODS: Mood[] = ['focused', 'learning', 'browsing', 'bored']
+const MOODS: Mood[] = ['focused', 'curious', 'restless', 'tired', 'inspired']
 
 function MoodPicker({ value, onChange }: { value: Mood | ''; onChange: (m: Mood | '') => void }) {
   const [open, setOpen] = useState(false)
@@ -82,7 +82,7 @@ function MoodPicker({ value, onChange }: { value: Mood | ''; onChange: (m: Mood 
 }
 
 interface Props {
-  onCapture: () => void
+  onCapture: (id: number) => void
   mood: Mood | ''
   onMoodChange: (m: Mood | '') => void
 }
@@ -110,14 +110,15 @@ export function CaptureBar({ onCapture, mood, onMoodChange }: Props) {
     if (loading) return
     setLoading(true)
     try {
+      let res: { id: number } | null = null
       if (tab === 'note' && note.trim()) {
-        await captureText(note.trim()); setNote('')
+        res = await captureText(note.trim()); setNote('')
       } else if (tab === 'link' && link.trim()) {
-        await captureLink(link.trim()); setLink('')
+        res = await captureLink(link.trim()); setLink('')
       } else if (tab === 'image' && file) {
-        await captureImage(file, caption); setFile(null); setCaption('')
+        res = await captureImage(file, caption); setFile(null); setCaption('')
       } else return
-      onCapture()
+      if (res) onCapture(res.id)
     } finally {
       setLoading(false)
     }

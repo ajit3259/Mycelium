@@ -1,153 +1,238 @@
-import { useState, useCallback } from 'react'
-import type { Capture, Mood } from './types'
-import { getCaptureRelated } from './api'
+import { useState, useCallback, useEffect, useRef } from 'react'
+import type { Capture, Mood, NavView } from './types'
+import { getCaptureRelated, getCaptures, getReviewQueue } from './api'
 import { CaptureBar } from './components/CaptureBar'
 import { SurfacePanel } from './components/SurfacePanel'
 import { Feed } from './components/Feed'
+import { Card } from './components/Card'
 import { Browse } from './components/Browse'
 import { GraphView } from './components/GraphView'
-
-type View = 'feed' | 'browse' | 'graph'
+import { NavRail } from './components/NavRail'
+import { AgentGuess } from './components/AgentGuess'
+import { ReviewScreen } from './components/ReviewScreen'
+import { AskScreen } from './components/AskScreen'
+import { BriefScreen } from './components/BriefScreen'
 
 function Spore({ size = 40 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 40 40" style={{ display: 'block', flexShrink: 0 }}>
-      <line x1="20" y1="20" x2="7"  y2="9"  stroke="var(--ink)" strokeWidth="2.4" />
-      <line x1="20" y1="20" x2="33" y2="11" stroke="var(--ink)" strokeWidth="2.4" />
-      <line x1="20" y1="20" x2="9"  y2="32" stroke="var(--ink)" strokeWidth="2.4" />
-      <line x1="20" y1="20" x2="32" y2="31" stroke="var(--ink)" strokeWidth="2.4" />
-      <circle cx="7"  cy="9"  r="4"   fill="var(--learn)" stroke="var(--ink)" strokeWidth="2.4" />
-      <circle cx="33" cy="11" r="3.4" fill="var(--act)"   stroke="var(--ink)" strokeWidth="2.4" />
-      <circle cx="9"  cy="32" r="3.4" fill="var(--ref)"   stroke="var(--ink)" strokeWidth="2.4" />
-      <circle cx="32" cy="31" r="4"   fill="var(--eph)"   stroke="var(--ink)" strokeWidth="2.4" />
-      <circle cx="20" cy="20" r="6"   fill="var(--ink)"   stroke="var(--ink)" strokeWidth="2.4" />
+      <line x1="20" y1="20" x2="7"  y2="9"  stroke="currentColor" strokeWidth="2.4" />
+      <line x1="20" y1="20" x2="33" y2="11" stroke="currentColor" strokeWidth="2.4" />
+      <line x1="20" y1="20" x2="9"  y2="32" stroke="currentColor" strokeWidth="2.4" />
+      <line x1="20" y1="20" x2="32" y2="31" stroke="currentColor" strokeWidth="2.4" />
+      <circle cx="7"  cy="9"  r="4"   fill="var(--learn)" stroke="currentColor" strokeWidth="2.4" />
+      <circle cx="33" cy="11" r="3.4" fill="var(--act)"   stroke="currentColor" strokeWidth="2.4" />
+      <circle cx="9"  cy="32" r="3.4" fill="var(--ref)"   stroke="currentColor" strokeWidth="2.4" />
+      <circle cx="32" cy="31" r="4"   fill="var(--eph)"   stroke="currentColor" strokeWidth="2.4" />
+      <circle cx="20" cy="20" r="6"   fill="currentColor" stroke="currentColor" strokeWidth="2.4" />
     </svg>
   )
 }
 
 export default function App() {
   const [refreshTrigger, setRefreshTrigger] = useState(0)
-  const [view, setView] = useState<View>('feed')
+  const [view, setView] = useState<NavView>('home')
+  const [prevView, setPrevView] = useState<NavView | null>(null)
   const [totalCount, setTotalCount] = useState<number | null>(null)
-  const [pinnedCapture, setPinnedCapture] = useState<Capture | null>(null)
+  const [selectedCapture, setSelectedCapture] = useState<Capture | null>(null)
   const [mood, setMood] = useState<Mood | ''>('')
+  const [pendingGuess, setPendingGuess] = useState<Capture | null>(null)
+  const [reviewCount, setReviewCount] = useState(0)
+
+  // Pending capture ID — poll until processing completes
+  const pendingIdRef = useRef<number | null>(null)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+
+  function startPolling(id: number) {
+    pendingIdRef.current = id
+    if (pollRef.current) clearInterval(pollRef.current)
+    pollRef.current = setInterval(async () => {
+      const all = await getCaptures(50).catch(() => [])
+      const found = all.find(c => c.id === pendingIdRef.current)
+      if (found?.summary && found?.intent) {
+        setPendingGuess(found)
+        pendingIdRef.current = null
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+      }
+    }, 3000)
+  }
+
+  useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
+
+  // Poll review queue count for nav badge
+  useEffect(() => {
+    function refresh() {
+      getReviewQueue(20).then(q => setReviewCount(q.length)).catch(() => {})
+    }
+    refresh()
+    const t = setInterval(refresh, 60_000)
+    return () => clearInterval(t)
+  }, [])
 
   const handlePick = useCallback(async (c: Capture) => {
     const related = c.related ?? await getCaptureRelated(c.id).catch(() => [])
-    const hydrated = { ...c, related }
-    setPinnedCapture(hydrated)
-    setTimeout(() => setPinnedCapture(null), 100)
-  }, [])
+    setSelectedCapture({ ...c, related })
+    setPrevView(view)
+    setView('home')
+  }, [view])
 
-  function handleCapture() {
+  function handleCapture(id: number) {
     setRefreshTrigger(n => n + 1)
-    // switch back to feed so user sees their new capture
-    setView('feed')
+    setView('home')
+    startPolling(id)
+  }
+
+  function dismissGuess() {
+    setPendingGuess(null)
+  }
+
+  function updateGuess(updated: Partial<Capture>) {
+    setPendingGuess(prev => prev ? { ...prev, ...updated } : null)
   }
 
   return (
     <div className="min-h-screen flex flex-col">
 
-      {/* ── Header ───────────────────────────────────── */}
-      <header
-        className="flex items-end justify-between flex-shrink-0 border-b-2 border-[var(--line)]"
-        style={{ padding: '20px 26px', background: 'var(--paper)' }}
-      >
-        <div className="flex items-center gap-4">
+      {/* ── Header (matches prototype) ────────────────── */}
+      <header style={{
+        display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between',
+        padding: '20px 26px', borderBottom: 'var(--bw) solid var(--line)',
+        background: 'var(--paper)', color: 'var(--ink)', flexShrink: 0,
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
           <Spore size={42} />
           <div>
-            <div style={{ fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1, color: 'var(--ink)' }}>
+            <div style={{ fontWeight: 700, fontSize: 30, letterSpacing: '-0.02em', lineHeight: 1 }}>
               MYCELIUM
             </div>
-            <div className="font-mono" style={{ marginTop: 5, fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', color: 'var(--ink-soft)' }}>
+            <div className="font-mono" style={{ marginTop: 5, fontSize: 11, fontWeight: 700, letterSpacing: '0.18em', textTransform: 'uppercase', opacity: 0.6 }}>
               Personal Knowledge Agent
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-3">
-          {/* Graph view toggle */}
-          <button
-            onClick={() => setView(v => v === 'graph' ? 'feed' : 'graph')}
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1 border-2 border-[var(--line)] inline-flex items-center gap-2 transition-all duration-100"
-            style={{
-              background: view === 'graph' ? 'var(--ink)' : 'var(--card)',
-              color: view === 'graph' ? 'var(--paper)' : 'var(--ink)',
-              boxShadow: view === 'graph' ? 'var(--shadow-sm)' : '2px 2px 0 var(--line)',
-              transform: view === 'graph' ? 'translate(-1px,-1px)' : '',
-              cursor: 'pointer',
-            }}
-          >
-            ⬡ graph
-          </button>
-
-          {/* Captures badge — clickable, opens Browse */}
-          <button
-            onClick={() => setView(v => v === 'browse' ? 'feed' : 'browse')}
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1 border-2 border-[var(--line)] inline-flex items-center gap-2 transition-all duration-100"
-            style={{
-              background: view === 'browse' ? 'var(--ink)' : 'var(--card)',
-              color: view === 'browse' ? 'var(--paper)' : 'var(--ink)',
-              boxShadow: view === 'browse' ? 'var(--shadow-sm)' : '2px 2px 0 var(--line)',
-              transform: view === 'browse' ? 'translate(-1px,-1px)' : '',
-              cursor: 'pointer',
-            }}
-          >
-            {totalCount !== null ? `${totalCount} captures` : 'captures'}
-          </button>
-
-          <span
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1 border-2 border-[var(--line)] inline-flex items-center gap-2"
-            style={{ background: 'var(--done)', boxShadow: '2px 2px 0 var(--line)', color: 'var(--ink)' }}
-          >
-            <span style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--ink)', display: 'inline-block' }} />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+          {totalCount !== null && (
+            <span className="font-mono" style={{
+              display: 'inline-flex', alignItems: 'center', gap: 6,
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+              padding: '3px 8px', border: '2.5px solid var(--line)',
+              background: 'var(--card)', boxShadow: '2px 2px 0 var(--line)',
+            }}>
+              {totalCount} CAPTURES
+            </span>
+          )}
+          <span className="font-mono" style={{
+            display: 'inline-flex', alignItems: 'center', gap: 6,
+            fontSize: 11, fontWeight: 700, letterSpacing: '0.08em',
+            padding: '3px 8px', border: '2.5px solid var(--line)',
+            background: 'var(--done)', boxShadow: '2px 2px 0 var(--line)',
+          }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: '50%', background: 'var(--ink)',
+              display: 'inline-block', animation: 'wob 2.4s ease-in-out infinite',
+            }} />
             LOCAL
           </span>
         </div>
       </header>
 
-      {/* ── Main grid ────────────────────────────────── */}
-      <div className="flex-1 grid grid-cols-1 md:grid-cols-[minmax(380px,460px)_1fr] overflow-hidden">
+      {/* ── Main layout: NavRail + content ───────────────── */}
+      <div style={{ flex: 1, display: 'flex', overflow: 'hidden', height: 'calc(100vh - 93px)' }}>
 
-        {/* Left panel — always visible */}
-        <aside
-          className="border-b-2 md:border-b-0 md:border-r-2 border-[var(--line)] flex flex-col md:overflow-y-auto"
-          style={{ padding: 22, gap: 22, height: 'calc(100vh - 89px)' }}
-        >
-          <div style={{ flexShrink: 0 }}>
-            <CaptureBar onCapture={handleCapture} mood={mood} onMoodChange={setMood} />
-          </div>
-          <div style={{ flexShrink: 0 }}>
-            <SurfacePanel pinnedCapture={pinnedCapture} onPick={handlePick} mood={mood} />
-          </div>
-        </aside>
+        <NavRail view={view} setView={setView} badges={{ review: reviewCount }} />
 
-        {/* Right panel — Feed or Browse */}
-        <main
-          className="md:overflow-y-auto"
-          style={{ padding: 22, height: 'calc(100vh - 89px)' }}
-        >
-          {view === 'feed' && (
-            <Feed
-              refreshTrigger={refreshTrigger}
-              onCountChange={setTotalCount}
-              onPick={handlePick}
-            />
-          )}
-          {view === 'browse' && (
+        {/* Home */}
+        {view === 'home' && (
+          <div style={{ flex: 1, display: 'grid', gridTemplateColumns: 'minmax(360px,440px) 1fr', minHeight: 0, overflow: 'hidden' }}>
+            <aside style={{
+              borderRight: 'var(--bw) solid var(--line)',
+              display: 'flex', flexDirection: 'column', gap: 20,
+              padding: 22, overflowY: 'auto',
+            }}>
+              <div style={{ flexShrink: 0 }}>
+                <CaptureBar onCapture={handleCapture} mood={mood} onMoodChange={setMood} />
+              </div>
+              {pendingGuess && (
+                <div style={{ flexShrink: 0 }}>
+                  <AgentGuess capture={pendingGuess} onConfirm={dismissGuess} onUpdate={updateGuess} />
+                </div>
+              )}
+              <div style={{ flexShrink: 0 }}>
+                <SurfacePanel onPick={handlePick} mood={mood} />
+              </div>
+            </aside>
+
+            <main style={{ overflowY: 'auto', padding: 22, position: 'relative' }}>
+              {selectedCapture ? (
+                <div style={{ animation: 'pop-in .15s ease both' }}>
+                  {/* back bar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                    <button
+                      onClick={() => {
+                        setSelectedCapture(null)
+                        if (prevView && prevView !== 'home') {
+                          setView(prevView)
+                          setPrevView(null)
+                        }
+                      }}
+                      className="font-mono"
+                      style={{
+                        fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                        padding: '6px 12px', border: '2px solid var(--line)', background: 'var(--card)',
+                        color: 'var(--ink)', cursor: 'pointer', boxShadow: '2px 2px 0 var(--line)',
+                      }}
+                    >← {prevView && prevView !== 'home' ? `Back to ${prevView}` : 'Back'}</button>
+                  </div>
+                  <Card
+                    capture={selectedCapture}
+                    variant="surface"
+                    onAction={() => setSelectedCapture(null)}
+                    onPick={handlePick}
+                  />
+                </div>
+              ) : (
+                <Feed
+                  refreshTrigger={refreshTrigger}
+                  onCountChange={setTotalCount}
+                  onPick={handlePick}
+                  limit={3}
+                  compact
+                  onBrowseAll={() => setView('browse')}
+                />
+              )}
+            </main>
+          </div>
+        )}
+
+        {view === 'ask' && <AskScreen onPick={handlePick} />}
+
+        {view === 'browse' && (
+          <div style={{ flex: 1, overflowY: 'auto', padding: 22 }}>
             <Browse onCountChange={setTotalCount} onPick={handlePick} />
-          )}
-          {view === 'graph' && (
+          </div>
+        )}
+
+        {view === 'brief' && <BriefScreen onPick={handlePick} />}
+
+        {view === 'review' && (
+          <ReviewScreen onExit={() => {
+            setView('home')
+            getReviewQueue(20).then(q => setReviewCount(q.length))
+          }} />
+        )}
+
+        {view === 'graph' && (
+          <main style={{ flex: 1, overflow: 'hidden', padding: 22 }}>
             <GraphView onPick={handlePick} />
-          )}
-        </main>
+          </main>
+        )}
 
       </div>
+
       {/* Footer */}
-      <div
-        className="font-mono border-t-2 border-[var(--line)] text-center flex-shrink-0"
-        style={{ padding: '8px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', background: 'var(--paper)' }}
-      >
+      <div className="font-mono border-t-2 border-[var(--line)] text-center flex-shrink-0"
+        style={{ padding: '8px 0', fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', background: 'var(--paper)' }}>
         Made with ♥ by Ajit &amp; Claude Code
       </div>
     </div>

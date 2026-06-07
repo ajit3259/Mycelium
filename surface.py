@@ -18,9 +18,10 @@ INTENT_WEIGHT = {
 # Mood adjusts intent weights. Missing keys = use default above.
 MOOD_OVERRIDES = {
     "focused":  {"act": 150, "learn": 40,  "reference": 20,  "ephemeral": -1},
-    "learning": {"act": 80,  "learn": 150, "reference": 40,  "ephemeral": -1},
-    "browsing": {"act": 60,  "learn": 90,  "reference": 80,  "ephemeral": 30},
-    "bored":    {"act": 30,  "learn": 50,  "reference": 60,  "ephemeral": 120},
+    "curious":  {"act": 60,  "learn": 150, "reference": 80,  "ephemeral": 20},
+    "restless": {"act": 120, "learn": 60,  "reference": 40,  "ephemeral": 80},
+    "tired":    {"act": 30,  "learn": 40,  "reference": 100, "ephemeral": 60},
+    "inspired": {"act": 80,  "learn": 120, "reference": 60,  "ephemeral": 40},
 }
 
 

@@ -1,4 +1,5 @@
 import io
+import re
 import json
 import math
 import base64
@@ -109,6 +110,112 @@ def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: 
     ]
     scored.sort(key=lambda x: x[1], reverse=True)
     return [cid for cid, score in scored[:top_n] if score >= SIMILARITY_THRESHOLD]
+
+
+RECALL_QUESTION_PROMPT = (
+    "Given this summary, write a single short question (max 12 words) that would prompt someone "
+    "to recall this specific insight from memory. The question should be specific to the content, "
+    "not generic. Reply with ONLY the question, no quotes, no punctuation at the end.\n\nSummary: "
+)
+
+def generate_recall_question(summary: str, intent: str) -> str:
+    """Generate a recall question for a capture. Falls back to intent-based template."""
+    FALLBACKS = {
+        "learn":     "What's the key insight here?",
+        "act":       "What were you going to do?",
+        "reference": "When would you reach for this?",
+        "ephemeral": "Why did this catch your attention?",
+    }
+    model = _loaded_model()
+    if not model or not summary:
+        return FALLBACKS.get(intent, "What do you remember about this?")
+    try:
+        q = _chat([{"role": "user", "content": RECALL_QUESTION_PROMPT + summary}], model)
+        q = q.strip().strip('"').strip("'")
+        if q and len(q) < 120:
+            return q
+    except Exception:
+        pass
+    return FALLBACKS.get(intent, "What do you remember about this?")
+
+
+def _parse_extend(text: str) -> dict:
+    """Robustly parse extend JSON — handles markdown fences, key variants, partial output."""
+    text = re.sub(r'```json|```', '', text).strip()
+    match = re.search(r'\{.*\}', text, re.DOTALL)
+    if match:
+        try:
+            data = json.loads(match.group())
+            gap = str(data.get("gap") or data.get("gaps") or "").strip()
+            questions = data.get("questions") or data.get("question") or []
+            if isinstance(questions, str):
+                questions = [questions]
+            return {"gap": gap, "questions": list(questions)[:3]}
+        except Exception:
+            pass
+    return {"gap": "", "questions": []}
+
+
+SYNTHESIZE_PROMPT = """\
+You are a personal knowledge assistant. The user asked: "{query}"
+
+Here are their relevant notes (numbered):
+{notes}
+
+Write a concise answer (3-5 sentences) grounded strictly in these notes.
+If the notes don't fully answer the question, say what they cover and what's missing.
+Do not add knowledge beyond what is in the notes.
+If any notes contradict each other on a key point, add one line at the end:
+[TENSION: <note A says X, note B says Y>]
+Reply in plain prose only. No bullet points, no headers, no markdown.\
+"""
+
+EXTEND_PROMPT = """\
+The user is learning about: "{query}"
+
+Their current knowledge from their notes:
+{synthesis}
+
+Reply ONLY with valid JSON. No markdown, no explanation. Start with {{ and end with }}.
+Identify:
+1. The single most important concept or gap NOT covered in their notes (1 sentence, "gap" key)
+2. Three specific follow-up questions worth capturing answers to ("questions" key, array of 3 strings)
+
+Example: {{"gap": "You haven't captured anything about ...", "questions": ["What is ...?", "How does ...?", "Why does ...?"]}}
+"""
+
+
+def synthesize_answer(query: str, captures: list) -> str:
+    """LM synthesizes a grounded answer from the user's captures. Returns prose string."""
+    model = _loaded_model()
+    if not model or not captures:
+        return ""
+    notes = "\n".join(
+        f"{i+1}. {c.get('summary') or c.get('raw') or ''}"
+        for i, c in enumerate(captures)
+        if c.get('summary') or c.get('raw')
+    )
+    if not notes.strip():
+        return ""
+    prompt = SYNTHESIZE_PROMPT.format(query=query, notes=notes)
+    try:
+        resp = _chat([{"role": "user", "content": prompt}], model)
+        return resp.strip()[:1500]
+    except Exception:
+        return ""
+
+
+def generate_extend(query: str, synthesis: str) -> dict:
+    """LM identifies gaps and generates follow-up questions. Returns {gap, questions}."""
+    model = _loaded_model()
+    if not model or not synthesis:
+        return {"gap": "", "questions": []}
+    prompt = EXTEND_PROMPT.format(query=query, synthesis=synthesis)
+    try:
+        resp = _chat([{"role": "user", "content": prompt}], model)
+        return _parse_extend(resp)
+    except Exception:
+        return {"gap": "", "questions": []}
 
 
 def process_image(file_path: str, description: str = "") -> dict:

@@ -39,6 +39,14 @@ def init_db():
             conn.execute("ALTER TABLE captures ADD COLUMN embedding TEXT")
         if "related_ids" not in cols:
             conn.execute("ALTER TABLE captures ADD COLUMN related_ids TEXT DEFAULT '[]'")
+        if "review_due_at" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN review_due_at TEXT")
+        if "review_interval" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN review_interval INTEGER DEFAULT 1")
+        if "review_count" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN review_count INTEGER DEFAULT 0")
+        if "recall_question" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN recall_question TEXT")
 
 
 def save_capture(type, raw=None, source_url=None, file_path=None):
@@ -50,16 +58,17 @@ def save_capture(type, raw=None, source_url=None, file_path=None):
         return cur.lastrowid
 
 
-def update_capture(capture_id, summary, tags, intent=None, embedding=None, related_ids=None):
+def update_capture(capture_id, summary, tags, intent=None, embedding=None, related_ids=None, recall_question=None):
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "UPDATE captures SET summary=?, tags=?, intent=?, embedding=?, related_ids=? WHERE id=?",
+            "UPDATE captures SET summary=?, tags=?, intent=?, embedding=?, related_ids=?, recall_question=? WHERE id=?",
             (
                 summary,
                 json.dumps(tags),
                 intent,
                 json.dumps(embedding) if embedding else None,
                 json.dumps(related_ids or []),
+                recall_question,
                 capture_id,
             ),
         )
@@ -96,6 +105,21 @@ def get_all_embeddings():
             "SELECT id, embedding FROM captures WHERE embedding IS NOT NULL"
         ).fetchall()
         return [(r[0], json.loads(r[1])) for r in rows]
+
+
+def get_captures_by_intent(intent: str, limit=50):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT * FROM captures WHERE intent=? ORDER BY created_at DESC LIMIT ?", (intent, limit)
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"] or "[]")
+            d.pop("embedding", None)
+            result.append(d)
+        return result
 
 
 def get_captures(limit=50):
@@ -147,3 +171,105 @@ def mark_done(capture_id):
             "UPDATE captures SET reviewed = 1 WHERE id = ?",
             (capture_id,),
         )
+
+
+def patch_capture(capture_id: int, intent: str = None, tags: list = None):
+    with sqlite3.connect(DB_PATH) as conn:
+        if intent is not None:
+            conn.execute("UPDATE captures SET intent=? WHERE id=?", (intent, capture_id))
+        if tags is not None:
+            conn.execute("UPDATE captures SET tags=? WHERE id=?", (json.dumps(tags), capture_id))
+
+
+def get_review_queue(limit=10) -> list:
+    """Return learn captures with review_due_at <= now, ordered by due date."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT * FROM captures
+            WHERE intent = 'learn'
+              AND summary IS NOT NULL
+              AND (
+                review_due_at IS NULL
+                OR review_due_at <= datetime('now', 'localtime')
+              )
+            ORDER BY COALESCE(review_due_at, created_at) ASC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"] or "[]")
+            d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d.pop("embedding", None)
+            result.append(d)
+        return result
+
+
+def record_review(capture_id: int, rating: str):
+    """SM-2 simplified: rating is 'got_it' or 'again'."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute(
+            "SELECT review_interval, review_count FROM captures WHERE id=?", (capture_id,)
+        ).fetchone()
+        if not row:
+            return
+        interval = row["review_interval"] or 1
+        count = row["review_count"] or 0
+        if rating == "got_it":
+            new_interval = max(1, round(interval * 2.5))
+            new_count = count + 1
+        else:
+            new_interval = 1
+            new_count = count
+        conn.execute("""
+            UPDATE captures
+            SET review_interval = ?,
+                review_count = ?,
+                review_due_at = datetime('now', 'localtime', ? || ' days'),
+                last_surfaced_at = datetime('now', 'localtime')
+            WHERE id = ?
+        """, (new_interval, new_count, str(new_interval), capture_id))
+
+
+def search_captures(q: str, limit=20) -> list:
+    pattern = f"%{q}%"
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT * FROM captures
+            WHERE summary IS NOT NULL AND (
+                summary LIKE ? OR tags LIKE ? OR raw LIKE ?
+            )
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (pattern, pattern, pattern, limit)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"] or "[]")
+            d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d.pop("embedding", None)
+            result.append(d)
+        return result
+
+
+def get_brief(limit=12) -> list:
+    """Recent unreviewed captures grouped by intent for digest view."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT * FROM captures
+            WHERE summary IS NOT NULL AND reviewed = 0
+            ORDER BY created_at DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"] or "[]")
+            d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d.pop("embedding", None)
+            result.append(d)
+        return result

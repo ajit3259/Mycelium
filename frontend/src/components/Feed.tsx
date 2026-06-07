@@ -7,24 +7,96 @@ interface Props {
   refreshTrigger: number
   onCountChange?: (n: number) => void
   onPick?: (c: Capture) => void
+  limit?: number
+  compact?: boolean
+  onBrowseAll?: () => void
 }
 
-export function Feed({ refreshTrigger, onCountChange, onPick }: Props) {
+export function Feed({ refreshTrigger, onCountChange, onPick, limit = 20, compact = false, onBrowseAll }: Props) {
   const [captures, setCaptures] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
-      const data = await getCaptures()
-      setCaptures(data)
+      const data = await getCaptures(compact ? 50 : limit)
+      // for compact mode we still want the count to reflect total
       onCountChange?.(data.length)
+      setCaptures(compact ? data.slice(0, limit) : data)
+    } finally {
+      setLoading(false)
     }
-    finally { setLoading(false) }
-  }, [onCountChange])
+  }, [onCountChange, limit, compact])
 
   useEffect(() => { load() }, [load, refreshTrigger])
 
+  if (compact) {
+    return (
+      <div>
+        {/* Just Added header */}
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+          <span className="font-mono" style={{
+            fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+            textTransform: 'uppercase', color: 'var(--ink-soft)',
+          }}>
+            Just Added
+          </span>
+          <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+            <button
+              onClick={load} disabled={loading}
+              className="font-mono"
+              style={{
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                padding: '4px 10px', border: '2px solid var(--line)', background: 'var(--card)',
+                color: 'var(--ink)', cursor: loading ? 'not-allowed' : 'pointer',
+                boxShadow: '2px 2px 0 var(--line)', opacity: loading ? 0.5 : 1,
+              }}
+            >{loading ? '…' : '↻'}</button>
+          </div>
+        </div>
+
+        {captures.length === 0 && !loading && (
+          <div style={{
+            border: '2px dashed var(--line)', padding: '28px 0', textAlign: 'center', opacity: 0.4,
+          }}>
+            <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink)', margin: 0 }}>
+              Nothing captured yet
+            </p>
+          </div>
+        )}
+
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+          {captures.map(c => (
+            <Card
+              key={c.id}
+              capture={c}
+              variant="feed"
+              onPick={onPick}
+              onDelete={id => setCaptures(prev => prev.filter(x => x.id !== id))}
+            />
+          ))}
+        </div>
+
+        {/* Browse all link */}
+        {onBrowseAll && (
+          <button
+            onClick={onBrowseAll}
+            className="font-mono"
+            style={{
+              marginTop: 14, width: '100%',
+              fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase',
+              padding: '10px 0', border: '2px solid var(--line)', background: 'transparent',
+              color: 'var(--ink-soft)', cursor: 'pointer',
+            }}
+          >
+            Browse all captures →
+          </button>
+        )}
+      </div>
+    )
+  }
+
+  // Full feed mode
   return (
     <div>
       <div className="flex items-baseline justify-between mb-6">

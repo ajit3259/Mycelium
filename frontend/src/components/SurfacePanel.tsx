@@ -1,37 +1,38 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { Capture, Mood, SurfaceMode } from '../types'
 import { getSurface } from '../api'
 import { Card } from './Card'
 
 interface Props {
-  pinnedCapture?: Capture | null
   onPick?: (c: Capture) => void
   mood?: Mood | ''
 }
 
-export function SurfacePanel({ pinnedCapture, onPick, mood }: Props) {
+export function SurfacePanel({ onPick, mood }: Props) {
   const [queue, setQueue] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
-  const [activeMode, setActiveMode] = useState<SurfaceMode | null>(null)
-
-  // When a card is picked from Feed/Browse, surface it immediately
-  useEffect(() => {
-    if (!pinnedCapture) return
-    setQueue(prev => {
-      // Don't duplicate if already in queue
-      if (prev.some(c => c.id === pinnedCapture.id)) return [pinnedCapture, ...prev.filter(c => c.id !== pinnedCapture.id)]
-      return [pinnedCapture, ...prev]
-    })
-    setActiveMode('all')
-  }, [pinnedCapture])
+  const [activeMode, setActiveMode] = useState<SurfaceMode>('all')
+  const mountedRef = useRef(false)
 
   async function surface(mode: SurfaceMode) {
-    setLoading(true); setActiveMode(mode)
-    try { setQueue(await getSurface(mode === 'all' ? undefined : mode, 3, mood || undefined)) }
-    finally { setLoading(false) }
+    setLoading(true)
+    setActiveMode(mode)
+    try {
+      setQueue(await getSurface(mode === 'all' ? undefined : mode, 3, mood || undefined))
+    } finally {
+      setLoading(false)
+    }
   }
 
-  // Show one at a time — Done/Skip removes head of queue
+  // Auto-surface on mount
+  useEffect(() => { surface('all') }, []) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Re-surface when mood changes (skip first render)
+  useEffect(() => {
+    if (!mountedRef.current) { mountedRef.current = true; return }
+    surface(activeMode)
+  }, [mood]) // eslint-disable-line react-hooks/exhaustive-deps
+
   function advance() {
     setQueue(prev => prev.slice(1))
   }
@@ -41,62 +42,85 @@ export function SurfacePanel({ pinnedCapture, onPick, mood }: Props) {
 
   return (
     <div>
-      {/* Header row: label + filter chips */}
-      <div className="flex items-center gap-3 flex-wrap mb-4">
-        <span
-          className="font-mono text-[11px] font-bold uppercase tracking-[0.16em]"
-          style={{ color: 'var(--ink-soft)' }}
-        >
-          What should I look at?
+      {/* Header */}
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 14 }}>
+        <span className="font-mono" style={{
+          fontSize: 10, fontWeight: 700, letterSpacing: '0.18em',
+          textTransform: 'uppercase', color: 'var(--ink-soft)',
+        }}>
+          Today's Focus
         </span>
-        <div className="flex gap-2 ml-auto">
-          {(['learn', 'act'] as SurfaceMode[]).map(mode => (
+        <div style={{ display: 'flex', gap: 6 }}>
+          {(['learn', 'act', 'all'] as SurfaceMode[]).map(mode => (
             <button
               key={mode}
               onClick={() => surface(mode)}
               disabled={loading}
-              className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1.5 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-40"
+              className="font-mono"
               style={{
-                background: activeMode === mode ? 'var(--ink)' : (mode === 'learn' ? 'var(--learn)' : 'var(--act)'),
+                fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                padding: '4px 10px', border: '2px solid var(--line)',
+                background: activeMode === mode ? 'var(--ink)' : 'var(--card)',
                 color: activeMode === mode ? 'var(--paper)' : 'var(--ink)',
-                boxShadow: '2px 2px 0 var(--line)',
+                cursor: loading ? 'not-allowed' : 'pointer',
+                opacity: loading ? 0.5 : 1,
+                boxShadow: activeMode === mode ? 'none' : '2px 2px 0 var(--line)',
               }}
             >
               {loading && activeMode === mode ? '…' : mode.toUpperCase()}
             </button>
           ))}
-          <button
-            onClick={() => surface('all')}
-            disabled={loading}
-            className="font-mono text-[11px] font-bold uppercase tracking-[0.08em] px-3 py-1.5 border-2 border-[var(--line)] transition-all duration-100 disabled:opacity-40"
-            style={{
-              background: activeMode === 'all' ? 'var(--ink)' : 'var(--card)',
-              color: activeMode === 'all' ? 'var(--paper)' : 'var(--ink)',
-              boxShadow: '2px 2px 0 var(--line)',
-            }}
-          >
-            {loading && activeMode === 'all' ? '…' : 'ALL'}
-          </button>
         </div>
       </div>
 
-      {/* One card at a time */}
+      {/* Loading skeleton */}
+      {loading && !current && (
+        <div style={{
+          border: 'var(--bw) solid var(--line)', background: 'var(--card)',
+          padding: '20px 18px', opacity: 0.4,
+        }}>
+          <div style={{ height: 12, background: 'var(--line)', borderRadius: 2, width: '60%', marginBottom: 10 }} />
+          <div style={{ height: 10, background: 'var(--line)', borderRadius: 2, width: '85%', marginBottom: 8 }} />
+          <div style={{ height: 10, background: 'var(--line)', borderRadius: 2, width: '40%' }} />
+        </div>
+      )}
+
+      {/* Current card */}
       {current && (
-        <div>
+        <div style={{ animation: 'pop-in .15s ease both' }}>
           {remaining > 1 && (
-            <p className="font-mono text-[10px] font-bold uppercase tracking-widest mb-2" style={{ color: 'var(--ink-soft)' }}>
-              {remaining} remaining
-            </p>
+            <div className="font-mono" style={{
+              fontSize: 10, fontWeight: 700, letterSpacing: '0.1em',
+              textTransform: 'uppercase', color: 'var(--ink-soft)',
+              marginBottom: 8,
+            }}>
+              {remaining} queued · <span
+                style={{ cursor: 'pointer', textDecoration: 'underline' }}
+                onClick={() => surface(activeMode)}
+              >shuffle</span>
+            </div>
           )}
           <Card key={current.id} capture={current} variant="surface" onAction={advance} onPick={onPick} />
         </div>
       )}
 
-      {!loading && activeMode !== null && !current && (
-        <div className="border-2 border-dashed border-[var(--line)] py-8 text-center" style={{ opacity: 0.6 }}>
-          <p className="font-mono text-[11px] font-bold uppercase tracking-widest" style={{ color: 'var(--ink)' }}>
+      {/* All done state */}
+      {!loading && queue.length === 0 && (
+        <div style={{
+          border: '2px dashed var(--line)', padding: '28px 0', textAlign: 'center',
+        }}>
+          <p className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--ink-soft)', margin: 0 }}>
             All clear ✦
           </p>
+          <button
+            onClick={() => surface(activeMode)}
+            className="font-mono"
+            style={{
+              marginTop: 10, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+              padding: '5px 12px', border: '2px solid var(--line)', background: 'var(--card)',
+              color: 'var(--ink)', cursor: 'pointer', boxShadow: '2px 2px 0 var(--line)',
+            }}
+          >↺ Resurface</button>
         </div>
       )}
     </div>

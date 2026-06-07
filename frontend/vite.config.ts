@@ -12,6 +12,10 @@ export default defineConfig({
       '/surface': 'http://localhost:8000',
       '/events': 'http://localhost:8000',
       '/uploads': 'http://localhost:8000',
+      '/search': 'http://localhost:8000',
+      '/review': 'http://localhost:8000',
+      '/brief': 'http://localhost:8000',
+      '/ask': 'http://localhost:8000',
     },
   },
   build: {

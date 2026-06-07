@@ -34,6 +34,7 @@ export function GraphView({ onPick }: Props) {
   const [captures, setCaptures] = useState<Capture[]>([])
   const [loading, setLoading] = useState(true)
   const [hovered, setHovered] = useState<{ capture: Capture; degree: number } | null>(null)
+  const [selected, setSelected] = useState<{ capture: Capture; degree: number } | null>(null)
 
   useEffect(() => {
     getCaptures(500).then(data => {
@@ -126,7 +127,7 @@ export function GraphView({ onPick }: Props) {
           .attr('r', d.r)
         setHovered(null)
       })
-      .on('pointerup.pick', (_, d) => { if (!dragMoved) onPick?.(d.capture) })
+      .on('pointerup.pick', (_, d) => { if (!dragMoved) setSelected({ capture: d.capture, degree: d.degree }) })
       .on('dblclick', (_, d) => { d.fx = null; d.fy = null })
 
     // Drag — directly update transforms (no sim restart → no click absorption by d3-drag)
@@ -221,30 +222,96 @@ export function GraphView({ onPick }: Props) {
 
         <svg ref={svgRef} width="100%" height="100%" />
 
-        {/* Hover tooltip */}
-        {hovered && (
+        {/* Hover tooltip — only when no node selected */}
+        {hovered && !selected && (
           <div style={{
-            position: 'absolute', bottom: 16, left: 16, right: 16,
+            position: 'absolute', bottom: 16, left: 16,
             background: 'var(--card)', border: '2px solid var(--line)',
-            boxShadow: 'var(--shadow)', padding: '10px 14px',
-            pointerEvents: 'none',
+            boxShadow: 'var(--shadow)', padding: '8px 12px',
+            pointerEvents: 'none', maxWidth: 320,
           }}>
-            <div style={{ display: 'flex', gap: 8, marginBottom: 6, alignItems: 'center' }}>
+            <div style={{ display: 'flex', gap: 6, marginBottom: 5, alignItems: 'center' }}>
               <span className="font-mono" style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', border: '2px solid var(--line)', background: INTENT_COLORS[hovered.capture.intent ?? ''] ?? '#eee', boxShadow: '2px 2px 0 var(--line)' }}>
-                {(hovered.capture.intent ?? 'unknown').toUpperCase()}
+                {(hovered.capture.intent ?? '—').toUpperCase()}
               </span>
               <span className="font-mono" style={{ fontSize: 10, fontWeight: 700, padding: '2px 6px', border: '2px solid var(--line)', background: 'var(--paper)', boxShadow: '2px 2px 0 var(--line)' }}>
                 {hovered.capture.type.toUpperCase()}
               </span>
               {hovered.degree > 0 && (
-                <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)' }}>
-                  ◇ {hovered.degree} edges
-                </span>
+                <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)' }}>◇ {hovered.degree}</span>
               )}
             </div>
-            <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', margin: 0, lineHeight: 1.4 }}>
+            <p style={{ fontSize: 13, fontWeight: 500, color: 'var(--ink)', margin: 0, lineHeight: 1.35 }}>
               {hovered.capture.summary ?? hovered.capture.raw ?? '(processing…)'}
             </p>
+          </div>
+        )}
+
+        {/* Click modal — side panel */}
+        {selected && (
+          <div style={{
+            position: 'absolute', top: 0, right: 0, bottom: 0, width: 320,
+            background: 'var(--card)', borderLeft: 'var(--bw) solid var(--line)',
+            boxShadow: '-4px 0 0 var(--line)',
+            display: 'flex', flexDirection: 'column',
+            animation: 'pop-in .15s ease both',
+          }}>
+            {/* header */}
+            <div style={{ display: 'flex', gap: 8, padding: '14px 16px', borderBottom: 'var(--bw) solid var(--line)', alignItems: 'center', flexShrink: 0 }}>
+              <span className="font-mono" style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', border: '2px solid var(--line)', background: INTENT_COLORS[selected.capture.intent ?? ''] ?? '#eee', boxShadow: '2px 2px 0 var(--line)' }}>
+                {(selected.capture.intent ?? '—').toUpperCase()}
+              </span>
+              <span className="font-mono" style={{ fontSize: 10, fontWeight: 700, padding: '3px 8px', border: '2px solid var(--line)', background: 'var(--paper)', boxShadow: '2px 2px 0 var(--line)' }}>
+                {selected.capture.type.toUpperCase()}
+              </span>
+              {selected.degree > 0 && (
+                <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)', marginLeft: 2 }}>◇ {selected.degree} edges</span>
+              )}
+              <button
+                onClick={() => setSelected(null)}
+                style={{ marginLeft: 'auto', background: 'transparent', border: 'none', cursor: 'pointer', fontSize: 18, color: 'var(--ink-soft)', lineHeight: 1, padding: '2px 4px' }}
+              >✕</button>
+            </div>
+
+            {/* body */}
+            <div style={{ flex: 1, overflowY: 'auto', padding: '16px 16px 20px' }}>
+              <p style={{ margin: '0 0 14px', fontSize: 16, lineHeight: 1.45, fontWeight: 500, color: 'var(--ink)' }}>
+                {selected.capture.summary ?? selected.capture.raw ?? '(processing…)'}
+              </p>
+
+              {selected.capture.source_url && (
+                <a href={selected.capture.source_url} target="_blank" rel="noopener noreferrer"
+                  className="font-mono"
+                  style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 11, fontWeight: 700, color: 'var(--ref)', textDecoration: 'none', marginBottom: 14, overflow: 'hidden' }}>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {selected.capture.source_url}</span>
+                </a>
+              )}
+
+              {selected.capture.tags?.length > 0 && (
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginBottom: 14 }}>
+                  {selected.capture.tags.map(t => (
+                    <span key={t} className="font-mono" style={{ fontSize: 11, padding: '2px 7px', border: '2px solid var(--line)', background: 'var(--paper)', borderRadius: 999 }}>{t}</span>
+                  ))}
+                </div>
+              )}
+
+              <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)', fontWeight: 700 }}>
+                {selected.capture.created_at?.slice(0, 16).replace('T', ' ')}
+              </span>
+            </div>
+
+            {/* actions */}
+            <div style={{ padding: '12px 16px', borderTop: 'var(--bw) solid var(--line)', flexShrink: 0 }}>
+              <button
+                onClick={() => { onPick?.(selected.capture); setSelected(null) }}
+                style={{
+                  width: '100%', fontSize: 13, fontWeight: 700, letterSpacing: '0.04em',
+                  textTransform: 'uppercase', padding: '10px 0',
+                  border: 'var(--bw) solid var(--line)', background: 'var(--learn)',
+                  color: 'var(--ink)', cursor: 'pointer', boxShadow: 'var(--shadow-sm)',
+                }}
+              >Open in recall →</button>
+            </div>
           </div>
         )}
       </div>
