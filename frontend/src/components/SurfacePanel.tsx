@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react'
-import type { Capture, SurfaceMode } from '../types'
+import type { Capture, Mood, SurfaceMode } from '../types'
 import { getSurface } from '../api'
 import { Card } from './Card'
 
 interface Props {
   pinnedCapture?: Capture | null
   onPick?: (c: Capture) => void
+  mood?: Mood | ''
 }
 
-export function SurfacePanel({ pinnedCapture, onPick }: Props) {
+export function SurfacePanel({ pinnedCapture, onPick, mood }: Props) {
   const [queue, setQueue] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
   const [activeMode, setActiveMode] = useState<SurfaceMode | null>(null)
@@ -26,7 +27,7 @@ export function SurfacePanel({ pinnedCapture, onPick }: Props) {
 
   async function surface(mode: SurfaceMode) {
     setLoading(true); setActiveMode(mode)
-    try { setQueue(await getSurface(mode === 'all' ? undefined : mode)) }
+    try { setQueue(await getSurface(mode === 'all' ? undefined : mode, 3, mood || undefined)) }
     finally { setLoading(false) }
   }
 

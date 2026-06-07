@@ -96,10 +96,14 @@ async def related_captures(capture_id: int):
 
 # ── surface endpoints ──────────────────────────────────────────────────────────
 
+VALID_MOODS = {"focused", "learning", "browsing", "bored"}
+
 @app.get("/surface")
-async def surface(mode: str = None, n: int = 3):
-    candidates = get_surfaceable()
-    items = pick(candidates, n=n, mode=mode)
+async def surface(mode: str = None, n: int = 3, mood: str = None):
+    mood = mood if mood in VALID_MOODS else None
+    include_ephemeral = mood == "bored"
+    candidates = get_surfaceable(include_ephemeral=include_ephemeral)
+    items = pick(candidates, n=n, mode=mode, mood=mood)
     for item in items:
         related_ids = json.loads(item.get("related_ids") or "[]")
         item["related"] = get_captures_by_ids(related_ids)

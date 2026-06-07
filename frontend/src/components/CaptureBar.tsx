@@ -81,16 +81,19 @@ function MoodPicker({ value, onChange }: { value: Mood | ''; onChange: (m: Mood 
   )
 }
 
-interface Props { onCapture: () => void }
+interface Props {
+  onCapture: () => void
+  mood: Mood | ''
+  onMoodChange: (m: Mood | '') => void
+}
 
-export function CaptureBar({ onCapture }: Props) {
+export function CaptureBar({ onCapture, mood, onMoodChange }: Props) {
   const [tab, setTab] = useState<Tab>('note')
   const [note, setNote] = useState('')
   const [link, setLink] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [caption, setCaption] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
-  const [mood, setMood] = useState<Mood | ''>('')
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -155,7 +158,7 @@ export function CaptureBar({ onCapture }: Props) {
         ))}
         {/* Mood selector — custom to avoid OS native dropdown */}
         <div className="flex-1 border-l-2 border-[var(--line)]">
-          <MoodPicker value={mood} onChange={setMood} />
+          <MoodPicker value={mood} onChange={onMoodChange} />
         </div>
       </div>
 

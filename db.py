@@ -108,16 +108,16 @@ def get_captures(limit=50):
         return result
 
 
-def get_surfaceable():
-    """Return all captures eligible for surfacing (non-ephemeral, has summary)."""
+def get_surfaceable(include_ephemeral=False):
+    """Return all captures eligible for surfacing."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
+        where = "intent IS NOT NULL AND summary IS NOT NULL AND reviewed = 0"
+        if not include_ephemeral:
+            where += " AND intent != 'ephemeral'"
+        rows = conn.execute(f"""
             SELECT * FROM captures
-            WHERE intent != 'ephemeral'
-              AND intent IS NOT NULL
-              AND summary IS NOT NULL
-              AND reviewed = 0
+            WHERE {where}
             ORDER BY created_at DESC
         """).fetchall()
         result = []

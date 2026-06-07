@@ -40,9 +40,10 @@ export async function captureImage(file: File, description = ''): Promise<{ id: 
   return r.json()
 }
 
-export async function getSurface(mode?: string, n = 3): Promise<Capture[]> {
+export async function getSurface(mode?: string, n = 3, mood?: string): Promise<Capture[]> {
   const params = new URLSearchParams({ n: String(n) })
   if (mode && mode !== 'all') params.set('mode', mode)
+  if (mood) params.set('mood', mood)
   const r = await fetch(`/surface?${params}`)
   return r.json()
 }

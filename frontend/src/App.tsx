@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react'
-import type { Capture } from './types'
+import type { Capture, Mood } from './types'
 import { getCaptureRelated } from './api'
 import { CaptureBar } from './components/CaptureBar'
 import { SurfacePanel } from './components/SurfacePanel'
@@ -30,6 +30,7 @@ export default function App() {
   const [view, setView] = useState<View>('feed')
   const [totalCount, setTotalCount] = useState<number | null>(null)
   const [pinnedCapture, setPinnedCapture] = useState<Capture | null>(null)
+  const [mood, setMood] = useState<Mood | ''>('')
 
   const handlePick = useCallback(async (c: Capture) => {
     const related = c.related ?? await getCaptureRelated(c.id).catch(() => [])
@@ -114,10 +115,10 @@ export default function App() {
           style={{ padding: 22, gap: 22, height: 'calc(100vh - 89px)' }}
         >
           <div style={{ flexShrink: 0 }}>
-            <CaptureBar onCapture={handleCapture} />
+            <CaptureBar onCapture={handleCapture} mood={mood} onMoodChange={setMood} />
           </div>
           <div style={{ flexShrink: 0 }}>
-            <SurfacePanel pinnedCapture={pinnedCapture} onPick={handlePick} />
+            <SurfacePanel pinnedCapture={pinnedCapture} onPick={handlePick} mood={mood} />
           </div>
         </aside>
 
