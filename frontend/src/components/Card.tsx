@@ -109,6 +109,19 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
           )}
         </div>
 
+        {/* Title */}
+        {capture.title && (
+          <p className="font-bold" style={{
+            margin: '0 0 8px',
+            fontSize: variant === 'surface' ? 18 : 15,
+            lineHeight: 1.25,
+            letterSpacing: '-0.01em',
+            color: 'var(--ink)',
+          }}>
+            {capture.title}
+          </p>
+        )}
+
         {/* Image thumbnail */}
         {capture.type === 'image' && capture.file_path && (
           <ImageThumb
@@ -118,11 +131,45 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
           />
         )}
 
-        {/* Summary or processing state */}
+        {/* Your take — shown prominently when present */}
+        {capture.your_take && (
+          <div style={{
+            margin: '0 0 10px',
+            padding: '8px 12px',
+            borderLeft: '3px solid var(--learn)',
+            background: 'var(--paper)',
+          }}>
+            <div className="font-mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--learn)', marginBottom: 4 }}>
+              Your take
+            </div>
+            <p style={{ margin: 0, fontSize: 14, lineHeight: 1.45, fontWeight: 500, fontStyle: 'italic', color: 'var(--ink)' }}>
+              "{capture.your_take}"
+            </p>
+          </div>
+        )}
+
+        {/* Claims as bullet points (if available), else summary */}
         {capture.summary ? (
-          <p style={{ margin: 0, fontSize: variant === 'surface' ? 19 : 16, lineHeight: 1.4, fontWeight: 500 }}>
-            {capture.summary}
-          </p>
+          Array.isArray(capture.claims) && capture.claims.length > 1 ? (
+            <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {capture.claims.map((claim, i) => (
+                <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{
+                    flexShrink: 0, marginTop: 5,
+                    width: 5, height: 5, borderRadius: '50%',
+                    background: 'var(--ink)', opacity: 0.4,
+                  }} />
+                  <span style={{ fontSize: variant === 'surface' ? 16 : 14, lineHeight: 1.45, fontWeight: 500 }}>
+                    {claim}
+                  </span>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p style={{ margin: 0, fontSize: variant === 'surface' ? 19 : 16, lineHeight: 1.4, fontWeight: 500 }}>
+              {capture.summary}
+            </p>
+          )
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
             <div style={{ minWidth: 0 }}>
@@ -186,6 +233,19 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
               </span>
             ))}
           </div>
+        )}
+
+        {/* Source content link */}
+        {capture.source_content_path && (
+          <a
+            href={`/uploads/content/${capture.id}.txt`}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="font-mono"
+            style={{ display: 'inline-block', marginTop: 8, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', color: 'var(--ink-soft)', textDecoration: 'none', opacity: 0.6 }}
+          >
+            ↗ view source
+          </a>
         )}
 
         {/* Connected — graph visualization */}

@@ -33,7 +33,9 @@ export function ConnectionGraph({ item, onPick }: Props) {
 
   const nodes = related.map((r, i) => {
     const a = angleFor(i)
-    return { r, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a) }
+    const raw = r.summary ?? r.tags?.[0] ?? r.intent ?? '?'
+    const label = raw.length > 18 ? raw.slice(0, 17) + '…' : raw
+    return { r, x: cx + R * Math.cos(a), y: cy + R * Math.sin(a), label }
   })
 
   const centerBg = (item.intent ? INTENT_BG[item.intent] : null) ?? '#eee'
@@ -60,13 +62,13 @@ export function ConnectionGraph({ item, onPick }: Props) {
       {/* Related nodes */}
       {nodes.map((nd, i) => {
         const bg = (nd.r.intent ? INTENT_BG[nd.r.intent] : null) ?? '#eee'
-        const tag = nd.r.tags?.[0] ?? nd.r.intent ?? '?'
         return (
           <g
             key={'n' + i}
             style={{ cursor: onPick ? 'pointer' : 'default' }}
             onClick={() => onPick?.(nd.r)}
           >
+            <title>{nd.r.summary ?? nd.r.tags?.join(', ') ?? ''}</title>
             <circle
               cx={nd.x} cy={nd.y} r={15}
               fill={bg}
@@ -81,7 +83,7 @@ export function ConnectionGraph({ item, onPick }: Props) {
               fontWeight="700"
               fill="var(--ink-soft)"
             >
-              {tag.length > 14 ? tag.slice(0, 13) + '…' : tag}
+              {nd.label}
             </text>
           </g>
         )

@@ -263,20 +263,61 @@ export function ReviewScreen({ onExit }: Props) {
             </>
           ) : (
             <>
-              <div className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 12 }}>
+              <div className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 14 }}>
                 ↓ the note
               </div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginBottom: 14 }}>
+
+              {/* Title */}
+              {card.title && (
+                <p style={{ margin: '0 0 12px', fontSize: 17, fontWeight: 700, lineHeight: 1.25, letterSpacing: '-0.01em' }}>
+                  {card.title}
+                </p>
+              )}
+
+              {/* Your take */}
+              {card.your_take && (
+                <div style={{ margin: '0 0 12px', padding: '8px 12px', borderLeft: '3px solid var(--learn)', background: 'var(--paper)' }}>
+                  <div className="font-mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--learn)', marginBottom: 4 }}>Your take</div>
+                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, fontStyle: 'italic', fontWeight: 500 }}>"{card.your_take}"</p>
+                </div>
+              )}
+
+              {/* Claims or summary */}
+              {Array.isArray(card.claims) && card.claims.length > 1 ? (
+                <ul style={{ margin: '0 0 12px', padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 7 }}>
+                  {card.claims.map((c, i) => (
+                    <li key={i} style={{ display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                      <span style={{ flexShrink: 0, marginTop: 7, width: 5, height: 5, borderRadius: '50%', background: 'var(--ink)', opacity: 0.4 }} />
+                      <span style={{ fontSize: 15, lineHeight: 1.5, fontWeight: 500 }}>{c}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p style={{ margin: '0 0 12px', fontSize: 16, lineHeight: 1.45, fontWeight: 500 }}>{card.summary}</p>
+              )}
+
+              {/* Source URL */}
+              {card.source_url && (() => {
+                let domain = ''
+                try { domain = new URL(card.source_url).hostname } catch {}
+                return (
+                  <a href={card.source_url} target="_blank" rel="noopener noreferrer" className="font-mono"
+                    style={{ display: 'flex', alignItems: 'center', gap: 5, marginBottom: 12, fontSize: 11, fontWeight: 700, color: 'var(--ref)', textDecoration: 'none' }}>
+                    {domain && <img src={`https://www.google.com/s2/favicons?domain=${domain}&sz=16`} width={12} height={12} alt="" style={{ border: '1px solid var(--line)' }} />}
+                    <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>↗ {card.source_url}</span>
+                  </a>
+                )
+              })()}
+
+              {/* Tags */}
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
                 {card.tags.map(t => (
                   <span key={t} className="font-mono" style={{
-                    fontSize: 11.5, padding: '2px 7px', border: '2px solid var(--line)',
+                    fontSize: 11, padding: '2px 7px', border: '2px solid var(--line)',
                     background: 'var(--paper)', borderRadius: 999, color: 'var(--ink)',
                   }}>{t}</span>
                 ))}
               </div>
-              <p style={{ margin: 0, fontSize: 18, lineHeight: 1.45, fontWeight: 500 }}>
-                {card.summary}
-              </p>
             </>
           )}
         </div>

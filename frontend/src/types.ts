@@ -22,6 +22,10 @@ export interface Capture {
   review_count: number
   score?: number
   recall_question?: string | null
+  title?: string | null
+  your_take?: string | null
+  claims?: string[]
+  source_content_path?: string | null
 }
 
 export type NavView = 'home' | 'ask' | 'browse' | 'brief' | 'review' | 'graph'

@@ -1,6 +1,6 @@
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import type { Capture } from '../types'
-import { searchCaptures, getCapturesByIntent, askSynthesize, askExtend } from '../api'
+import { searchCaptures, getCapturesByIntent, askSynthesize, askExtend, askFeynman, askFeynmanGrade, askArc } from '../api'
 import { Card } from './Card'
 
 const SUGGESTIONS = [
@@ -124,6 +124,22 @@ interface ExtendState {
   done: boolean
 }
 
+interface FeynmanState {
+  questions: string[]
+  answers: string[]
+  grades: Array<{ verdict: string; feedback: string } | null>
+  loadingQuestions: boolean
+  gradingLoading: boolean
+  graded: boolean
+  open: boolean
+}
+
+interface ArcState {
+  periods: Array<{ label: string; start_date: string; end_date: string; insight: string; capture_count: number }>
+  loading: boolean
+  done: boolean
+}
+
 interface Props {
   onPick?: (c: Capture) => void
 }
@@ -139,6 +155,11 @@ export function AskScreen({ onPick }: Props) {
 
   const [synthesis, setSynthesis] = useState<SynthesisState>({ text: '', tension: null, loading: false, done: false })
   const [extend, setExtend] = useState<ExtendState>({ gap: '', questions: [], loading: false, done: false })
+  const [feynman, setFeynman] = useState<FeynmanState>({
+    questions: [], answers: [], grades: [],
+    loadingQuestions: false, gradingLoading: false, graded: false, open: false,
+  })
+  const [arc, setArc] = useState<ArcState>({ periods: [], loading: false, done: false })
 
   const inputRef = useRef<HTMLInputElement>(null)
   const synthesisRef = useRef<HTMLDivElement>(null)
@@ -153,6 +174,8 @@ export function AskScreen({ onPick }: Props) {
     setExpandedId(null)
     setSynthesis({ text: '', tension: null, loading: false, done: false })
     setExtend({ gap: '', questions: [], loading: false, done: false })
+    setFeynman({ questions: [], answers: [], grades: [], loadingQuestions: false, gradingLoading: false, graded: false, open: false })
+    setArc({ periods: [], loading: false, done: false })
   }, [])
 
   const runSearch = useCallback(async (query: string) => {
@@ -199,6 +222,56 @@ export function AskScreen({ onPick }: Props) {
     const res = await askExtend(submitted, synthesis.text).catch(() => ({ gap: '', questions: [] }))
     setExtend({ gap: res.gap, questions: res.questions, loading: false, done: true })
   }, [submitted, synthesis.text])
+
+  // Date span in days across results — used to decide whether to show arc button
+  const dateSpan = useMemo(() => {
+    if (results.length < 3) return 0
+    const dates = results.map(c => c.created_at?.slice(0, 10)).filter(Boolean).sort() as string[]
+    if (dates.length < 2) return 0
+    return Math.floor((new Date(dates[dates.length - 1]).getTime() - new Date(dates[0]).getTime()) / 86400000)
+  }, [results])
+
+  const openFeynman = useCallback(async () => {
+    if (!submitted || !synthCandidates.length) return
+    setFeynman(f => ({ ...f, open: true, loadingQuestions: true, questions: [], answers: [], grades: [], graded: false }))
+    const ids = synthCandidates.map(c => c.id)
+    try {
+      const res = await askFeynman(submitted, ids)
+      setFeynman(f => ({
+        ...f,
+        loadingQuestions: false,
+        questions: res.questions,
+        answers: res.questions.map(() => ''),
+        grades: res.questions.map(() => null),
+      }))
+    } catch {
+      setFeynman(f => ({ ...f, loadingQuestions: false }))
+    }
+  }, [submitted, synthCandidates])
+
+  const submitFeynmanAnswers = useCallback(async () => {
+    const ids = synthCandidates.map(c => c.id)
+    const qa = feynman.questions.map((q, i) => ({ question: q, answer: feynman.answers[i] ?? '' }))
+    setFeynman(f => ({ ...f, gradingLoading: true }))
+    try {
+      const res = await askFeynmanGrade(qa, ids)
+      setFeynman(f => ({ ...f, gradingLoading: false, graded: true, grades: res.grades }))
+    } catch {
+      setFeynman(f => ({ ...f, gradingLoading: false, graded: true }))
+    }
+  }, [feynman.questions, feynman.answers, synthCandidates])
+
+  const runArc = useCallback(async () => {
+    if (!submitted || !results.length) return
+    setArc({ periods: [], loading: true, done: false })
+    const ids = results.map(c => c.id)
+    try {
+      const res = await askArc(submitted, ids)
+      setArc({ periods: res.periods, loading: false, done: true })
+    } catch {
+      setArc({ periods: [], loading: false, done: true })
+    }
+  }, [submitted, results])
 
   function onKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
     if (e.key === 'Enter') runSearch(q)
@@ -426,20 +499,39 @@ export function AskScreen({ onPick }: Props) {
                       </div>
                     )}
 
-                    {!extend.done && !extend.loading && (
-                      <button
-                        onClick={runExtend}
-                        style={{
-                          marginTop: 16, width: '100%',
-                          fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
-                          padding: '10px 0', border: '2px solid var(--paper)',
-                          background: 'transparent', color: 'var(--paper)',
-                          cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
-                        }}
-                      >
-                        → What am I missing?
-                      </button>
+                    {(!extend.done || !feynman.open) && (
+                      <div style={{ marginTop: 16, display: 'flex', gap: 8 }}>
+                        {!extend.done && !extend.loading && (
+                          <button
+                            onClick={runExtend}
+                            style={{
+                              flex: 1,
+                              fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                              padding: '10px 0', border: '2px solid var(--paper)',
+                              background: 'transparent', color: 'var(--paper)',
+                              cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            }}
+                          >
+                            → What am I missing?
+                          </button>
+                        )}
+                        {!feynman.open && synthCandidates.length > 0 && (
+                          <button
+                            onClick={openFeynman}
+                            style={{
+                              flex: 1,
+                              fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                              padding: '10px 0', border: '2px solid var(--learn)',
+                              background: 'transparent', color: 'var(--learn)',
+                              cursor: 'pointer',
+                              display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                            }}
+                          >
+                            🧠 Test yourself
+                          </button>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -542,6 +634,229 @@ export function AskScreen({ onPick }: Props) {
                 {extend.done && !extend.gap && extend.questions.length === 0 && (
                   <div style={{ padding: '14px 0', opacity: 0.5 }}>
                     <p className="font-mono" style={{ fontSize: 12, fontWeight: 700 }}>Could not generate extensions — try again.</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ── Phase 4: Feynman ── */}
+            {feynman.open && (
+              <section style={{ animation: 'pop-in .2s ease both' }}>
+                <div className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 14, height: 14, background: 'var(--learn)', border: '2px solid var(--line)', display: 'inline-block', flexShrink: 0 }} />
+                  Test yourself — Feynman mode
+                </div>
+
+                {feynman.loadingQuestions && (
+                  <div style={{ border: 'var(--bw) solid var(--line)', background: 'var(--card)', padding: '18px', opacity: 0.6 }}>
+                    <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>Generating questions…</span>
+                  </div>
+                )}
+
+                {!feynman.loadingQuestions && feynman.questions.length > 0 && (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                    {/* Grade summary */}
+                    {feynman.graded && (
+                      <div style={{ padding: '12px 16px', border: 'var(--bw) solid var(--line)', background: 'var(--card)', boxShadow: 'var(--shadow)' }}>
+                        {(() => {
+                          const rights = feynman.grades.filter(g => g?.verdict === 'right').length
+                          const total = feynman.questions.length
+                          return (
+                            <span className="font-mono" style={{ fontSize: 13, fontWeight: 700 }}>
+                              {rights}/{total} correct ·{' '}
+                              <span style={{ color: rights === total ? 'var(--done)' : rights >= total / 2 ? 'var(--learn)' : 'var(--act)' }}>
+                                {rights === total ? 'You nailed it' : rights >= total / 2 ? 'Solid understanding' : 'Review these notes again'}
+                              </span>
+                            </span>
+                          )
+                        })()}
+                      </div>
+                    )}
+
+                    {feynman.questions.map((q, i) => {
+                      const grade = feynman.graded ? feynman.grades[i] : null
+                      const verdictColor = grade?.verdict === 'right' ? 'var(--done)' : grade?.verdict === 'partial' ? 'var(--learn)' : grade?.verdict === 'wrong' ? 'var(--act)' : 'var(--paper)'
+                      return (
+                        <div key={i} style={{
+                          border: 'var(--bw) solid var(--line)', background: 'var(--card)',
+                          boxShadow: 'var(--shadow-sm)', overflow: 'hidden',
+                        }}>
+                          {/* Question */}
+                          <div style={{ display: 'flex', gap: 10, padding: '12px 14px', borderBottom: grade ? 'var(--bw) solid var(--line)' : 'none', alignItems: 'flex-start' }}>
+                            <span className="font-mono" style={{
+                              flexShrink: 0, width: 22, height: 22, display: 'grid', placeItems: 'center',
+                              background: grade ? verdictColor : 'var(--ink)', color: 'var(--paper)',
+                              fontSize: 11, fontWeight: 700, border: '2px solid var(--line)',
+                            }}>{i + 1}</span>
+                            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.45, fontWeight: 600, flex: 1 }}>{q}</p>
+                            {grade && (
+                              <span className="font-mono" style={{
+                                flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                                padding: '3px 8px', border: '2px solid var(--line)', background: verdictColor,
+                                boxShadow: '2px 2px 0 var(--line)', color: 'var(--ink)',
+                              }}>
+                                {grade.verdict}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* Answer textarea or result */}
+                          <div style={{ padding: '10px 14px' }}>
+                            {!feynman.graded ? (
+                              <textarea
+                                value={feynman.answers[i] ?? ''}
+                                onChange={e => {
+                                  const updated = [...feynman.answers]
+                                  updated[i] = e.target.value
+                                  setFeynman(f => ({ ...f, answers: updated }))
+                                }}
+                                placeholder="Type your answer…"
+                                rows={3}
+                                style={{
+                                  width: '100%', border: '2px solid var(--line)',
+                                  background: 'var(--paper)', color: 'var(--ink)',
+                                  fontSize: 14, padding: '8px 10px', resize: 'vertical',
+                                  outline: 'none', fontFamily: 'inherit', boxSizing: 'border-box',
+                                }}
+                              />
+                            ) : (
+                              <div>
+                                <p style={{ margin: '0 0 6px', fontSize: 14, color: 'var(--ink-soft)', fontStyle: 'italic' }}>
+                                  "{feynman.answers[i] || '(no answer)'}"
+                                </p>
+                                {grade?.feedback && (
+                                  <p className="font-mono" style={{ margin: 0, fontSize: 11, fontWeight: 700, color: 'var(--ink-soft)' }}>
+                                    ↳ {grade.feedback}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                          </div>
+                        </div>
+                      )
+                    })}
+
+                    {/* Submit / retry buttons */}
+                    {!feynman.graded && (() => {
+                      const filled = feynman.answers.filter(a => a.trim().length > 0).length
+                      const allFilled = filled === feynman.questions.length
+                      return (
+                        <div>
+                          {!allFilled && !feynman.gradingLoading && (
+                            <p className="font-mono" style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-soft)', letterSpacing: '0.08em', marginBottom: 8 }}>
+                              {filled}/{feynman.questions.length} answered — fill in all answers before submitting
+                            </p>
+                          )}
+                          <button
+                            onClick={submitFeynmanAnswers}
+                            disabled={feynman.gradingLoading || !allFilled}
+                            style={{
+                              width: '100%',
+                              fontSize: 13, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                              padding: '12px 0', border: 'var(--bw) solid var(--line)',
+                              background: allFilled ? 'var(--ink)' : 'var(--card)',
+                              color: allFilled ? 'var(--paper)' : 'var(--ink-soft)',
+                              cursor: (feynman.gradingLoading || !allFilled) ? 'default' : 'pointer',
+                              boxShadow: allFilled ? 'var(--shadow-sm)' : 'none',
+                              opacity: feynman.gradingLoading ? 0.6 : 1,
+                            }}
+                          >
+                            {feynman.gradingLoading ? 'Grading…' : 'Submit for grading'}
+                          </button>
+                        </div>
+                      )
+                    })()}
+
+                    {feynman.graded && (
+                      <button
+                        onClick={() => setFeynman(f => ({ ...f, graded: false, grades: f.questions.map(() => null), answers: f.questions.map(() => '') }))}
+                        className="font-mono"
+                        style={{
+                          alignSelf: 'flex-start', fontSize: 11, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                          padding: '6px 12px', border: '2px solid var(--line)', background: 'var(--paper)',
+                          color: 'var(--ink)', cursor: 'pointer', boxShadow: '2px 2px 0 var(--line)',
+                        }}
+                      >↺ Try again</button>
+                    )}
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* ── Phase 5: Learning Arc ── */}
+            {!arc.done && !arc.loading && dateSpan >= 14 && synthesis.done && (
+              <section>
+                <button
+                  onClick={runArc}
+                  style={{
+                    width: '100%',
+                    fontSize: 12, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                    padding: '11px 0', border: '2px dashed var(--line)',
+                    background: 'var(--card)', color: 'var(--ink-soft)',
+                    cursor: 'pointer',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8,
+                  }}
+                >
+                  📅 How my thinking on this evolved ({dateSpan}d span)
+                </button>
+              </section>
+            )}
+
+            {(arc.loading || arc.done) && (
+              <section style={{ animation: 'pop-in .2s ease both' }}>
+                <div className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.15em', textTransform: 'uppercase', color: 'var(--ink-soft)', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                  <span style={{ width: 14, height: 14, background: 'var(--ref)', border: '2px solid var(--line)', display: 'inline-block', flexShrink: 0 }} />
+                  {arc.loading ? 'Tracing your arc…' : 'Learning arc'}
+                </div>
+
+                {arc.loading && (
+                  <div style={{ border: 'var(--bw) solid var(--line)', background: 'var(--card)', padding: '18px', opacity: 0.6 }}>
+                    <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>Mapping how your understanding evolved…</span>
+                  </div>
+                )}
+
+                {arc.done && arc.periods.length > 0 && (
+                  <div style={{ position: 'relative', paddingLeft: 28 }}>
+                    {/* Vertical line */}
+                    <div style={{ position: 'absolute', left: 10, top: 12, bottom: 12, width: 3, background: 'var(--line)' }} />
+
+                    {arc.periods.map((period, i) => {
+                      const opacity = 0.5 + (i / Math.max(1, arc.periods.length - 1)) * 0.5
+                      return (
+                        <div key={i} style={{ position: 'relative', marginBottom: 16 }}>
+                          {/* Node */}
+                          <div style={{
+                            position: 'absolute', left: -22, top: 14,
+                            width: 13, height: 13, borderRadius: '50%',
+                            background: 'var(--ref)', border: '2.5px solid var(--ink)',
+                            opacity,
+                          }} />
+                          <div style={{
+                            border: 'var(--bw) solid var(--line)', background: 'var(--card)',
+                            boxShadow: 'var(--shadow-sm)', padding: '14px 16px',
+                            opacity,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                              <span className="font-mono" style={{
+                                fontSize: 10, fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase',
+                                padding: '3px 8px', border: '2px solid var(--line)', background: 'var(--paper)',
+                                boxShadow: '2px 2px 0 var(--line)',
+                              }}>{period.label}</span>
+                              <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)', fontWeight: 700 }}>
+                                {period.start_date?.slice(0, 10)}{period.end_date && period.end_date !== period.start_date ? ` → ${period.end_date?.slice(0, 10)}` : ''} · {period.capture_count} note{period.capture_count !== 1 ? 's' : ''}
+                              </span>
+                            </div>
+                            <p style={{ margin: 0, fontSize: 15, lineHeight: 1.5, fontWeight: 500 }}>{period.insight}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+
+                {arc.done && arc.periods.length === 0 && (
+                  <div style={{ padding: '14px 0', opacity: 0.5 }}>
+                    <p className="font-mono" style={{ fontSize: 12, fontWeight: 700 }}>Could not identify distinct phases — captures may span too short a period.</p>
                   </div>
                 )}
               </section>

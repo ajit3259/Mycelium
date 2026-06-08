@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import type { Capture } from '../types'
 import { getCaptures } from '../api'
 import { Card } from './Card'
@@ -15,20 +15,48 @@ interface Props {
 export function Feed({ refreshTrigger, onCountChange, onPick, limit = 20, compact = false, onBrowseAll }: Props) {
   const [captures, setCaptures] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   const load = useCallback(async () => {
     setLoading(true)
     try {
       const data = await getCaptures(compact ? 50 : limit)
-      // for compact mode we still want the count to reflect total
       onCountChange?.(data.length)
       setCaptures(compact ? data.slice(0, limit) : data)
+      return data
     } finally {
       setLoading(false)
     }
   }, [onCountChange, limit, compact])
 
-  useEffect(() => { load() }, [load, refreshTrigger])
+  // Auto-poll while any capture is still processing
+  const startPolling = useCallback(() => {
+    if (pollRef.current) return
+    pollRef.current = setInterval(async () => {
+      const data = await getCaptures(compact ? 50 : limit)
+      onCountChange?.(data.length)
+      setCaptures(compact ? data.slice(0, limit) : data)
+      const stillProcessing = data.some(c => !c.summary)
+      if (!stillProcessing) {
+        clearInterval(pollRef.current!)
+        pollRef.current = null
+      }
+    }, 3000)
+  }, [onCountChange, limit, compact])
+
+  useEffect(() => {
+    load().then(data => {
+      if (data?.some(c => !c.summary)) startPolling()
+    })
+    return () => {
+      if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+    }
+  }, [refreshTrigger])
+
+  // Start polling when a new capture is added (refreshTrigger bumps)
+  useEffect(() => {
+    if (captures.some(c => !c.summary)) startPolling()
+  }, [captures])
 
   if (compact) {
     return (

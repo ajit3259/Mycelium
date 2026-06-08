@@ -13,18 +13,26 @@ from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse, FileResponse
 
 from config import UPLOADS_DIR, DB_PATH
+
+CONTENT_DIR = UPLOADS_DIR / "content"
 from db import (
     init_db, save_capture, update_capture, get_captures, get_surfaceable,
     mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids,
     delete_capture, patch_capture, get_review_queue, record_review,
-    search_captures, get_brief, get_brief_dates, get_captures_by_intent,
+    search_captures, get_brief, get_brief_dates, get_brief_week, get_captures_by_intent,
     get_review_history, get_review_streak,
 )
-from lm import process_text, process_link, process_image, embed, find_related, generate_recall_question, synthesize_answer, generate_extend
+from lm import (
+    process_text, process_link, process_image, embed, find_related,
+    generate_recall_question, synthesize_answer, generate_extend,
+    generate_feynman_questions, grade_feynman_answers, generate_learning_arc,
+    generate_brief_synthesis, generate_weekly_synthesis,
+)
 from surface import pick
 
 app = FastAPI()
 UPLOADS_DIR.mkdir(exist_ok=True)
+CONTENT_DIR.mkdir(exist_ok=True)
 
 
 @app.api_route("/api/watch", methods=["GET", "POST", "OPTIONS"])
@@ -40,16 +48,16 @@ async def startup():
 # ── capture endpoints ──────────────────────────────────────────────────────────
 
 @app.post("/capture/text")
-async def capture_text(background_tasks: BackgroundTasks, content: str = Form(...)):
-    cid = save_capture("text", raw=content)
-    background_tasks.add_task(_process, cid, "text", content=content)
+async def capture_text(background_tasks: BackgroundTasks, content: str = Form(...), your_take: str = Form("")):
+    cid = save_capture("text", raw=content, your_take=your_take)
+    background_tasks.add_task(_process, cid, "text", content=content, your_take=your_take)
     return {"id": cid, "status": "captured"}
 
 
 @app.post("/capture/link")
-async def capture_link(background_tasks: BackgroundTasks, url: str = Form(...)):
-    cid = save_capture("link", raw=url, source_url=url)
-    background_tasks.add_task(_process, cid, "link", url=url)
+async def capture_link(background_tasks: BackgroundTasks, url: str = Form(...), your_take: str = Form("")):
+    cid = save_capture("link", raw=url, source_url=url, your_take=your_take)
+    background_tasks.add_task(_process, cid, "link", url=url, your_take=your_take)
     return {"id": cid, "status": "captured"}
 
 
@@ -58,16 +66,24 @@ async def capture_image(
     background_tasks: BackgroundTasks,
     file: UploadFile = File(...),
     description: str = Form(""),
+    your_take: str = Form(""),
 ):
     dest = UPLOADS_DIR / file.filename
     with open(dest, "wb") as f:
         shutil.copyfileobj(file.file, f)
-    cid = save_capture("image", raw=description or None, file_path=str(dest))
-    background_tasks.add_task(_process, cid, "image", file_path=str(dest), description=description)
+    cid = save_capture("image", raw=description or None, file_path=str(dest), your_take=description or None)
+    background_tasks.add_task(_process, cid, "image", file_path=str(dest), description=description, your_take=description)
     return {"id": cid, "status": "captured"}
 
 
 # ── uploads ───────────────────────────────────────────────────────────────────
+
+@app.get("/uploads/content/{capture_id}.txt")
+async def serve_source_content(capture_id: int):
+    path = CONTENT_DIR / f"{capture_id}.txt"
+    if not path.exists():
+        raise HTTPException(status_code=404)
+    return FileResponse(path, media_type="text/plain; charset=utf-8")
 
 @app.get("/uploads/{filename:path}")
 async def serve_upload(filename: str):
@@ -252,11 +268,67 @@ async def ask_extend(body: ExtendBody):
     return result
 
 
+class FeynmanBody(BaseModel):
+    query: str
+    capture_ids: List[int]
+
+class FeynmanGradeBody(BaseModel):
+    qa_pairs: List[dict]
+    capture_ids: List[int]
+
+class ArcBody(BaseModel):
+    query: str
+    capture_ids: List[int]
+
+@app.post("/ask/feynman")
+async def ask_feynman(body: FeynmanBody):
+    if not body.query.strip() or not body.capture_ids:
+        return {"questions": []}
+    captures = get_captures_by_ids(body.capture_ids[:8])
+    loop = asyncio.get_event_loop()
+    questions = await loop.run_in_executor(None, generate_feynman_questions, body.query.strip(), captures)
+    return {"questions": questions}
+
+@app.post("/ask/feynman/grade")
+async def ask_feynman_grade(body: FeynmanGradeBody):
+    if not body.qa_pairs or not body.capture_ids:
+        return {"grades": []}
+    captures = get_captures_by_ids(body.capture_ids[:8])
+    loop = asyncio.get_event_loop()
+    grades = await loop.run_in_executor(None, grade_feynman_answers, body.qa_pairs, captures)
+    return {"grades": grades}
+
+@app.post("/ask/arc")
+async def ask_arc(body: ArcBody):
+    if not body.query.strip() or not body.capture_ids:
+        return {"periods": []}
+    captures = get_captures_by_ids(body.capture_ids[:15])
+    loop = asyncio.get_event_loop()
+    periods = await loop.run_in_executor(None, generate_learning_arc, body.query.strip(), captures)
+    return {"periods": periods}
+
+
 # ── brief ──────────────────────────────────────────────────────────────────────
 
 @app.get("/brief/dates")
 async def brief_dates():
     return get_brief_dates()
+
+@app.get("/brief/week")
+async def brief_week():
+    return get_brief_week()
+
+
+class WeeklySynthesisBody(BaseModel):
+    daily_entries: List[dict]  # [{date, synthesis, count}]
+
+@app.post("/brief/week/synthesize")
+async def brief_week_synthesize(body: WeeklySynthesisBody):
+    if not body.daily_entries:
+        return {"synthesis": ""}
+    loop = asyncio.get_event_loop()
+    synthesis = await loop.run_in_executor(None, generate_weekly_synthesis, body.daily_entries)
+    return {"synthesis": synthesis}
 
 @app.get("/brief")
 async def brief(limit: int = 50, date: Optional[str] = None):
@@ -268,46 +340,109 @@ async def brief(limit: int = 50, date: Optional[str] = None):
     return grouped
 
 
+class BriefSynthesisBody(BaseModel):
+    capture_ids: List[int]
+    date_label: Optional[str] = None
+
+@app.post("/brief/synthesize")
+async def brief_synthesize(body: BriefSynthesisBody):
+    if not body.capture_ids:
+        return {"synthesis": ""}
+    captures = get_captures_by_ids(body.capture_ids[:20])
+    loop = asyncio.get_event_loop()
+    synthesis = await loop.run_in_executor(
+        None, generate_brief_synthesis, captures, body.date_label or ""
+    )
+    return {"synthesis": synthesis}
+
+
+# ── admin / maintenance ────────────────────────────────────────────────────────
+
+@app.post("/admin/regenerate-questions")
+async def regenerate_questions(background_tasks: BackgroundTasks):
+    background_tasks.add_task(_regenerate_questions_bg)
+    return {"status": "started"}
+
+async def _regenerate_questions_bg():
+    import sqlite3
+    loop = asyncio.get_event_loop()
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute(
+            "SELECT id, summary, intent, claims FROM captures WHERE summary IS NOT NULL"
+        ).fetchall()
+
+    updated = 0
+    for row in rows:
+        try:
+            claims = json.loads(row["claims"] or "[]")
+            q = await loop.run_in_executor(
+                None, generate_recall_question, row["summary"], row["intent"] or "", claims
+            )
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute("UPDATE captures SET recall_question=? WHERE id=?", (q, row["id"]))
+            updated += 1
+        except Exception as e:
+            print(f"[regen-questions] id={row['id']} error: {e}")
+
+    print(f"[regen-questions] done — updated {updated} captures")
+
+
 # ── background processing ──────────────────────────────────────────────────────
 
 async def _process(cid: int, type: str, **kwargs):
     loop = asyncio.get_event_loop()
+    your_take = kwargs.get("your_take", "")
+    source_content_path = None
     try:
         if type == "text":
-            result = await loop.run_in_executor(None, process_text, kwargs["content"])
+            content = kwargs["content"]
+            path = CONTENT_DIR / f"{cid}.txt"
+            path.write_text(content, encoding="utf-8")
+            source_content_path = str(path)
+            result = await loop.run_in_executor(None, process_text, content, your_take)
 
         elif type == "link":
-            page_text = await _fetch_text(kwargs["url"])
-            result = await loop.run_in_executor(None, process_link, kwargs["url"], page_text)
+            page_text, page_title = await _fetch_page(kwargs["url"])
+            if page_text:
+                path = CONTENT_DIR / f"{cid}.txt"
+                path.write_text(page_text, encoding="utf-8")
+                source_content_path = str(path)
+            result = await loop.run_in_executor(None, process_link, kwargs["url"], page_text, your_take, page_title)
 
         elif type == "image":
-            result = await loop.run_in_executor(None, process_image, kwargs["file_path"], kwargs.get("description", ""))
+            result = await loop.run_in_executor(None, process_image, kwargs["file_path"], kwargs.get("description", ""), your_take)
 
         else:
             return
 
         summary = result.get("summary") or ""
+        claims = result.get("claims") or []
+        title = result.get("title") or ""
         intent = result.get("intent")
-        emb = await loop.run_in_executor(None, embed, summary)
+        embed_text = summary + (" " + claims[0] if claims else "")
+        emb = await loop.run_in_executor(None, embed, embed_text)
         all_embs = get_all_embeddings()
         related = find_related(emb, all_embs, exclude_id=cid)
-        recall_q = await loop.run_in_executor(None, generate_recall_question, summary, intent or "")
-        update_capture(cid, summary, result.get("tags", []), intent, emb, related, recall_q)
+        recall_q = await loop.run_in_executor(None, generate_recall_question, summary, intent or "", claims)
+        update_capture(cid, summary, result.get("tags", []), intent, emb, related, recall_q, claims, source_content_path, title)
 
     except Exception as e:
         print(f"[process error] {e}")
 
 
-async def _fetch_text(url: str) -> str:
+async def _fetch_page(url: str) -> tuple[str, str]:
+    """Returns (page_text, page_title)."""
     try:
         async with httpx.AsyncClient(follow_redirects=True, timeout=10) as client:
             resp = await client.get(url, headers={"User-Agent": "Mozilla/5.0"})
             soup = BeautifulSoup(resp.text, "html.parser")
+            page_title = (soup.title.string or "").strip() if soup.title else ""
             for tag in soup(["script", "style", "nav", "footer"]):
                 tag.decompose()
-            return soup.get_text(separator=" ", strip=True)[:4000]
+            return soup.get_text(separator=" ", strip=True), page_title
     except Exception:
-        return ""
+        return "", ""
 
 
 app.mount("/", StaticFiles(directory="static", html=True), name="static")

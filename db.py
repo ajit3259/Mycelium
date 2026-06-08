@@ -47,21 +47,29 @@ def init_db():
             conn.execute("ALTER TABLE captures ADD COLUMN review_count INTEGER DEFAULT 0")
         if "recall_question" not in cols:
             conn.execute("ALTER TABLE captures ADD COLUMN recall_question TEXT")
+        if "title" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN title TEXT")
+        if "your_take" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN your_take TEXT")
+        if "claims" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN claims TEXT DEFAULT '[]'")
+        if "source_content_path" not in cols:
+            conn.execute("ALTER TABLE captures ADD COLUMN source_content_path TEXT")
 
 
-def save_capture(type, raw=None, source_url=None, file_path=None):
+def save_capture(type, raw=None, source_url=None, file_path=None, your_take=None):
     with sqlite3.connect(DB_PATH) as conn:
         cur = conn.execute(
-            "INSERT INTO captures (type, raw, source_url, file_path) VALUES (?, ?, ?, ?)",
-            (type, raw, source_url, file_path),
+            "INSERT INTO captures (type, raw, source_url, file_path, your_take) VALUES (?, ?, ?, ?, ?)",
+            (type, raw, source_url, file_path, your_take or None),
         )
         return cur.lastrowid
 
 
-def update_capture(capture_id, summary, tags, intent=None, embedding=None, related_ids=None, recall_question=None):
+def update_capture(capture_id, summary, tags, intent=None, embedding=None, related_ids=None, recall_question=None, claims=None, source_content_path=None, title=None):
     with sqlite3.connect(DB_PATH) as conn:
         conn.execute(
-            "UPDATE captures SET summary=?, tags=?, intent=?, embedding=?, related_ids=?, recall_question=? WHERE id=?",
+            "UPDATE captures SET summary=?, tags=?, intent=?, embedding=?, related_ids=?, recall_question=?, claims=?, source_content_path=?, title=? WHERE id=?",
             (
                 summary,
                 json.dumps(tags),
@@ -69,6 +77,9 @@ def update_capture(capture_id, summary, tags, intent=None, embedding=None, relat
                 json.dumps(embedding) if embedding else None,
                 json.dumps(related_ids or []),
                 recall_question,
+                json.dumps(claims or []),
+                source_content_path,
+                title,
                 capture_id,
             ),
         )
@@ -92,6 +103,7 @@ def get_captures_by_ids(ids: list) -> list:
         for r in rows:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             d.pop("embedding", None)
             d.pop("related_ids", None)
             result.append(d)
@@ -117,6 +129,7 @@ def get_captures_by_intent(intent: str, limit=50):
         for r in rows:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             d.pop("embedding", None)
             result.append(d)
         return result
@@ -133,6 +146,7 @@ def get_captures(limit=50):
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
             d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             result.append(d)
         return result
 
@@ -153,6 +167,7 @@ def get_surfaceable(include_ephemeral=False):
         for r in rows:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             result.append(d)
         return result
 
@@ -201,6 +216,7 @@ def get_review_queue(limit=10) -> list:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
             d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             d.pop("embedding", None)
             result.append(d)
         return result
@@ -293,6 +309,7 @@ def search_captures(q: str, limit=20) -> list:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
             d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             d.pop("embedding", None)
             result.append(d)
         return result
@@ -321,6 +338,28 @@ def get_brief(limit=50, date: str = None) -> list:
             d = dict(r)
             d["tags"] = json.loads(d["tags"] or "[]")
             d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
+            d.pop("embedding", None)
+            result.append(d)
+        return result
+
+
+def get_brief_week() -> list:
+    """All captures from the last 7 days, newest first."""
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        rows = conn.execute("""
+            SELECT * FROM captures
+            WHERE summary IS NOT NULL
+              AND date(created_at) >= date('now', '-6 days', 'localtime')
+            ORDER BY created_at DESC
+        """).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["tags"] = json.loads(d["tags"] or "[]")
+            d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+            d["claims"] = json.loads(d.get("claims") or "[]")
             d.pop("embedding", None)
             result.append(d)
         return result

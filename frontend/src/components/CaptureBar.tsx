@@ -18,6 +18,7 @@ export function CaptureBar({ onCapture }: Props) {
   const [link, setLink] = useState('')
   const [file, setFile] = useState<File | null>(null)
   const [caption, setCaption] = useState('')
+  const [yourTake, setYourTake] = useState('')
   const [previewUrl, setPreviewUrl] = useState<string | null>(null)
   const [dragging, setDragging] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -37,11 +38,11 @@ export function CaptureBar({ onCapture }: Props) {
     try {
       let res: { id: number } | null = null
       if (tab === 'note' && note.trim()) {
-        res = await captureText(note.trim()); setNote('')
+        res = await captureText(note.trim(), yourTake); setNote(''); setYourTake('')
       } else if (tab === 'link' && link.trim()) {
-        res = await captureLink(link.trim()); setLink('')
+        res = await captureLink(link.trim(), yourTake); setLink(''); setYourTake('')
       } else if (tab === 'image' && file) {
-        res = await captureImage(file, caption); setFile(null); setCaption('')
+        res = await captureImage(file, caption, yourTake); setFile(null); setCaption(''); setYourTake('')
       } else return
       if (res) onCapture(res.id)
     } finally {
@@ -198,6 +199,21 @@ export function CaptureBar({ onCapture }: Props) {
             accept="image/*"
             className="hidden"
             onChange={e => e.target.files?.[0] && pickFile(e.target.files[0])}
+          />
+        </div>
+      )}
+
+      {/* Your take — only for note and link, not image (caption serves that role) */}
+      {tab !== 'image' && (
+        <div style={{ borderTop: '2px solid var(--line)', background: 'var(--paper)', padding: '10px 16px' }}>
+          <textarea
+            value={yourTake}
+            onChange={e => setYourTake(e.target.value)}
+            onKeyDown={onKeyDown}
+            placeholder="Your take on this? (optional — makes extraction much richer)"
+            rows={2}
+            className="w-full resize-none border-none outline-none text-[13px] leading-relaxed font-mono"
+            style={{ background: 'transparent', color: 'var(--ink)', opacity: yourTake ? 1 : 0.6 }}
           />
         </div>
       )}
