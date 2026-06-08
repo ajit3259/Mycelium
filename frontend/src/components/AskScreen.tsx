@@ -375,9 +375,16 @@ export function AskScreen({ onPick }: Props) {
               </div>
 
               {!searching && results.length === 0 && (
-                <div style={{ textAlign: 'center', padding: '30px 0', opacity: 0.6 }}>
-                  <div style={{ fontSize: 36 }}>◎</div>
-                  <p style={{ fontWeight: 500, marginTop: 8 }}>Nothing on "{submitted}" yet.<br />Capture something first.</p>
+                <div style={{ padding: '28px 20px', border: '2px solid var(--line)', background: 'var(--card)' }}>
+                  <div className="font-mono" style={{ fontSize: 11, fontWeight: 700, letterSpacing: '0.12em', color: 'var(--ink-soft)', marginBottom: 10 }}>
+                    ◎ NOTHING CAPTURED ON THIS YET
+                  </div>
+                  <p style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 500, color: 'var(--ink)' }}>
+                    No notes found for "{submitted}".
+                  </p>
+                  <p style={{ margin: 0, fontSize: 13, color: 'var(--ink-soft)', lineHeight: 1.5 }}>
+                    Capture a link, note, or image about this topic — then ask again. The more you capture, the richer the synthesis.
+                  </p>
                 </div>
               )}
 

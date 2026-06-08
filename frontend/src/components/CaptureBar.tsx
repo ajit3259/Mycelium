@@ -185,7 +185,7 @@ export function CaptureBar({ onCapture }: Props) {
                 value={caption}
                 onChange={e => setCaption(e.target.value)}
                 onKeyDown={onKeyDown}
-                placeholder="Add a note about this image… (optional)"
+                placeholder="Why are you saving this?"
                 rows={3}
                 className="w-full resize-none border-none outline-none px-5 py-4 text-[16px] leading-relaxed block"
                 style={{ background: 'var(--card)', color: 'var(--ink)' }}
@@ -210,7 +210,7 @@ export function CaptureBar({ onCapture }: Props) {
             value={yourTake}
             onChange={e => setYourTake(e.target.value)}
             onKeyDown={onKeyDown}
-            placeholder="Your take on this? (optional — makes extraction much richer)"
+            placeholder="Why are you saving this?"
             rows={2}
             className="w-full resize-none border-none outline-none text-[13px] leading-relaxed font-mono"
             style={{ background: 'transparent', color: 'var(--ink)', opacity: yourTake ? 1 : 0.6 }}

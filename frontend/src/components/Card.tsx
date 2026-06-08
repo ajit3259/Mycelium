@@ -173,7 +173,7 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
         ) : (
           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
             <div style={{ minWidth: 0 }}>
-              <p className="font-mono" style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-soft)', textTransform: 'uppercase' }}>
+              <p className="font-mono" style={{ margin: '0 0 4px', fontSize: 11, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-soft)', textTransform: 'uppercase', animation: 'pulse-opacity 1.6s ease-in-out infinite' }}>
                 ◌ Processing…
               </p>
               {(capture.raw || capture.source_url) && (

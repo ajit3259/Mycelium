@@ -277,8 +277,8 @@ export function ReviewScreen({ onExit }: Props) {
               {/* Your take */}
               {card.your_take && (
                 <div style={{ margin: '0 0 12px', padding: '8px 12px', borderLeft: '3px solid var(--learn)', background: 'var(--paper)' }}>
-                  <div className="font-mono" style={{ fontSize: 9, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--learn)', marginBottom: 4 }}>Your take</div>
-                  <p style={{ margin: 0, fontSize: 13, lineHeight: 1.45, fontStyle: 'italic', fontWeight: 500 }}>"{card.your_take}"</p>
+                  <div className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.12em', textTransform: 'uppercase', color: 'var(--learn)', marginBottom: 5 }}>◆ Your take</div>
+                  <p style={{ margin: 0, fontSize: 14, lineHeight: 1.5, fontStyle: 'italic', fontWeight: 500 }}>"{card.your_take}"</p>
                 </div>
               )}
 
