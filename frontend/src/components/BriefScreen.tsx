@@ -50,8 +50,9 @@ interface Props {
 }
 
 export function BriefScreen({ onPick }: Props) {
+  const today = new Date().toISOString().slice(0, 10)
   const [dates, setDates] = useState<{ date: string; count: number }[]>([])
-  const [selectedDate, setSelectedDate] = useState<string | null>(null)
+  const [selectedDate, setSelectedDate] = useState<string>(today)
   const [grouped, setGrouped] = useState<Record<string, Capture[]>>({})
   const [loading, setLoading] = useState(true)
   const [read, setRead] = useState(false)
@@ -61,20 +62,18 @@ export function BriefScreen({ onPick }: Props) {
     getBriefDates().then(setDates).catch(() => {})
   }, [])
 
-  // Load brief whenever selectedDate changes (null = today's unreviewed)
+  // Load brief whenever selectedDate changes
   useEffect(() => {
     setLoading(true)
     setRead(false)
-    getBrief(selectedDate ?? undefined)
+    getBrief(selectedDate)
       .then(g => { setGrouped(g); setLoading(false) })
       .catch(() => { setGrouped({}); setLoading(false) })
   }, [selectedDate])
 
-  const today = new Date().toISOString().slice(0, 10)
-  const activeDate = selectedDate ?? today
-  const dateLabel = isToday(activeDate)
+  const dateLabel = isToday(selectedDate)
     ? new Date().toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
-    : formatDate(activeDate).toUpperCase()
+    : formatDate(selectedDate).toUpperCase()
 
   const totalItems = Object.values(grouped).reduce((n, arr) => n + arr.length, 0)
   const intentOrder = ['learn', 'act', 'reference', 'ephemeral', 'other']
@@ -92,16 +91,16 @@ export function BriefScreen({ onPick }: Props) {
             display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 20,
             paddingBottom: 4,
           }}>
-            {/* Today pill (unreviewed) */}
+            {/* Today pill */}
             <button
-              onClick={() => setSelectedDate(null)}
+              onClick={() => setSelectedDate(today)}
               className="font-mono"
               style={{
                 flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
                 padding: '5px 12px', border: '2.5px solid var(--line)',
-                background: selectedDate === null ? 'var(--ink)' : 'var(--card)',
-                color: selectedDate === null ? 'var(--paper)' : 'var(--ink)',
-                cursor: 'pointer', boxShadow: selectedDate === null ? 'none' : '2px 2px 0 var(--line)',
+                background: selectedDate === today ? 'var(--ink)' : 'var(--card)',
+                color: selectedDate === today ? 'var(--paper)' : 'var(--ink)',
+                cursor: 'pointer', boxShadow: selectedDate === today ? 'none' : '2px 2px 0 var(--line)',
               }}
             >Today</button>
             {dates.map(d => (
@@ -136,13 +135,8 @@ export function BriefScreen({ onPick }: Props) {
               {dateLabel}
             </div>
             <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 6 }}>
-              {selectedDate === null ? 'Daily Brief' : 'Past Brief'}
+              {isToday(selectedDate) ? 'Daily Brief' : 'Past Brief'}
             </div>
-            {selectedDate === null && (
-              <div className="font-mono" style={{ fontSize: 10, opacity: 0.5, marginTop: 4, letterSpacing: '0.1em' }}>
-                UNREVIEWED CAPTURES
-              </div>
-            )}
           </div>
           <div style={{ textAlign: 'right' }}>
             <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: 'var(--learn)' }}>{loading ? '—' : totalItems}</div>
@@ -160,7 +154,7 @@ export function BriefScreen({ onPick }: Props) {
           <div style={{ textAlign: 'center', padding: '60px 0', opacity: 0.6 }}>
             <div style={{ fontSize: 40 }}>◎</div>
             <p style={{ fontWeight: 500, marginTop: 8 }}>
-              {selectedDate ? 'No captures found for this date.' : 'All caught up — nothing unreviewed.'}
+              {isToday(selectedDate) ? 'Nothing captured today yet.' : 'No captures found for this date.'}
             </p>
           </div>
         )}
@@ -185,7 +179,7 @@ export function BriefScreen({ onPick }: Props) {
         ))}
 
         {/* Mark read — only for today's brief */}
-        {!loading && groups.length > 0 && selectedDate === null && (
+        {!loading && groups.length > 0 && isToday(selectedDate) && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30, marginBottom: 10 }}>
             <button
               onClick={() => setRead(true)}
