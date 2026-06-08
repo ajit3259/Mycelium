@@ -1,31 +1,54 @@
 import { useState, useEffect } from 'react'
 import type { Capture } from '../types'
-import { getReviewQueue, postReview } from '../api'
+import { getReviewQueue, postReview, getReviewHistory } from '../api'
 
 const WEEK_LABELS = ['M', 'T', 'W', 'T', 'F', 'S', 'S']
 
-function WeekStrip({ big = false }: { big?: boolean }) {
-  const today = new Date().getDay()
-  const mon = today === 0 ? 6 : today - 1
+function WeekStrip({ reviewedDates, streak, big = false }: { reviewedDates: string[]; streak: number; big?: boolean }) {
   const sz = big ? 34 : 26
+  const todayDate = new Date()
+  const todayStr = todayDate.toISOString().slice(0, 10)
+
+  // Build Mon-Sun of current week
+  const dayOfWeek = todayDate.getDay() // 0=Sun
+  const mondayOffset = dayOfWeek === 0 ? 6 : dayOfWeek - 1
+  const weekDates = WEEK_LABELS.map((_, i) => {
+    const d = new Date(todayDate)
+    d.setDate(todayDate.getDate() - mondayOffset + i)
+    return d.toISOString().slice(0, 10)
+  })
+
+  const reviewedSet = new Set(reviewedDates)
+
   return (
-    <div style={{ display: 'flex', gap: big ? 8 : 6, justifyContent: 'center' }}>
-      {WEEK_LABELS.map((label, i) => {
-        const isPast = i < mon
-        const isToday = i === mon
-        return (
-          <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
-            <div style={{
-              width: sz, height: sz, border: '2.5px solid var(--line)',
-              display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: big ? 16 : 12,
-              background: isToday ? 'var(--learn)' : isPast ? 'var(--card)' : 'var(--card)',
-            }}>
-              {isToday ? '•' : ''}
+    <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10 }}>
+      <div style={{ display: 'flex', gap: big ? 8 : 6 }}>
+        {weekDates.map((date, i) => {
+          const isToday = date === todayStr
+          const reviewed = reviewedSet.has(date)
+          const isFuture = date > todayStr
+          return (
+            <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 5 }}>
+              <div style={{
+                width: sz, height: sz, border: '2.5px solid var(--line)',
+                display: 'grid', placeItems: 'center', fontWeight: 700, fontSize: big ? 14 : 11,
+                background: reviewed ? 'var(--done)' : isToday ? 'var(--learn)' : 'var(--card)',
+                opacity: isFuture ? 0.35 : 1,
+              }}>
+                {reviewed ? '✓' : isToday ? '•' : ''}
+              </div>
+              <span className="font-mono" style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--ink-soft)' }}>
+                {WEEK_LABELS[i]}
+              </span>
             </div>
-            <span className="font-mono" style={{ fontSize: 9.5, fontWeight: 700, color: 'var(--ink-soft)' }}>{label}</span>
-          </div>
-        )
-      })}
+          )
+        })}
+      </div>
+      {streak > 0 && (
+        <span className="font-mono" style={{ fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', color: 'var(--ink-soft)' }}>
+          {streak} DAY STREAK 🔥
+        </span>
+      )}
     </div>
   )
 }
@@ -59,12 +82,27 @@ export function ReviewScreen({ onExit }: Props) {
   const [revealed, setRevealed] = useState(false)
   const [done, setDone] = useState(false)
   const [stats, setStats] = useState({ got: 0, again: 0 })
+  const [reviewedDates, setReviewedDates] = useState<string[]>([])
+  const [streak, setStreak] = useState(0)
 
   useEffect(() => {
-    getReviewQueue(20)
-      .then(q => { setQueue(q); setLoading(false) })
-      .catch(() => { setQueue([]); setLoading(false) })
+    Promise.all([
+      getReviewQueue(20).catch(() => []),
+      getReviewHistory().catch(() => ({ reviewed_dates: [], streak: 0 })),
+    ]).then(([q, h]) => {
+      setQueue(q)
+      setReviewedDates(h.reviewed_dates)
+      setStreak(h.streak)
+      setLoading(false)
+    })
   }, [])
+
+  // refresh history after rating (today may now be reviewed)
+  async function refreshHistory() {
+    const h = await getReviewHistory().catch(() => ({ reviewed_dates: [], streak: 0 }))
+    setReviewedDates(h.reviewed_dates)
+    setStreak(h.streak)
+  }
 
   async function rate(rating: 'got_it' | 'again') {
     const card = queue[idx]
@@ -74,6 +112,7 @@ export function ReviewScreen({ onExit }: Props) {
       setIdx(idx + 1)
       setRevealed(false)
     } else {
+      await refreshHistory()
       setDone(true)
     }
   }
@@ -94,7 +133,7 @@ export function ReviewScreen({ onExit }: Props) {
         <p style={{ color: 'var(--ink-soft)', margin: '8px 0 18px', fontSize: 15 }}>
           Your queue is clear. Capture more ideas and they'll resurface when it matters.
         </p>
-        <div style={{ margin: '0 0 20px' }}><WeekStrip /></div>
+        <div style={{ margin: '0 0 20px' }}><WeekStrip reviewedDates={reviewedDates} streak={streak} /></div>
         <button
           onClick={onExit}
           style={{
@@ -122,7 +161,7 @@ export function ReviewScreen({ onExit }: Props) {
           background: 'var(--paper)', whiteSpace: 'nowrap',
         }}>GARDEN TENDED</div>
 
-        <div style={{ margin: '20px 0 18px' }}><WeekStrip big /></div>
+        <div style={{ margin: '20px 0 18px' }}><WeekStrip reviewedDates={reviewedDates} streak={streak} big /></div>
 
         <p style={{ margin: '0 0 20px', fontWeight: 500, fontSize: 15 }}>
           Revisited <b>{queue.length}</b> {queue.length === 1 ? 'memory' : 'memories'} · <b>{stats.got}</b> stuck · <b>{stats.again}</b> coming back sooner.

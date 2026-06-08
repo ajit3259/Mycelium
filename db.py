@@ -231,6 +231,49 @@ def record_review(capture_id: int, rating: str):
                 last_surfaced_at = datetime('now', 'localtime')
             WHERE id = ?
         """, (new_interval, new_count, str(new_interval), capture_id))
+        # persist review event for streak tracking
+        conn.execute(
+            "INSERT INTO events (capture_id, event, value, created_at) VALUES (?, 'review', ?, datetime('now','localtime'))",
+            (capture_id, rating)
+        )
+
+
+def get_review_history(days: int = 7) -> list:
+    """Return list of dates (YYYY-MM-DD) in the past `days` that had at least one review."""
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT date(created_at) as day
+            FROM events
+            WHERE event = 'review'
+              AND created_at >= datetime('now', 'localtime', ? || ' days')
+            ORDER BY day DESC
+        """, (f"-{days}",)).fetchall()
+        return [r[0] for r in rows]
+
+
+def get_review_streak() -> int:
+    """Count consecutive days ending today that had at least one review."""
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT DISTINCT date(created_at) as day
+            FROM events
+            WHERE event = 'review'
+            ORDER BY day DESC
+            LIMIT 60
+        """).fetchall()
+    dates = [r[0] for r in rows]
+    if not dates:
+        return 0
+    from datetime import date, timedelta
+    today = date.today()
+    streak = 0
+    for i in range(len(dates)):
+        expected = (today - timedelta(days=i)).isoformat()
+        if i < len(dates) and dates[i] == expected:
+            streak += 1
+        else:
+            break
+    return streak
 
 
 def search_captures(q: str, limit=20) -> list:

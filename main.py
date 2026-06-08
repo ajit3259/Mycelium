@@ -18,6 +18,7 @@ from db import (
     mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids,
     delete_capture, patch_capture, get_review_queue, record_review,
     search_captures, get_brief, get_brief_dates, get_captures_by_intent,
+    get_review_history, get_review_streak,
 )
 from lm import process_text, process_link, process_image, embed, find_related, generate_recall_question, synthesize_answer, generate_extend
 from surface import pick
@@ -172,6 +173,10 @@ async def patch_capture_endpoint(capture_id: int, body: PatchBody):
 @app.get("/review")
 async def review_queue(limit: int = 10):
     return get_review_queue(limit)
+
+@app.get("/review/history")
+async def review_history(days: int = 7):
+    return {"reviewed_dates": get_review_history(days), "streak": get_review_streak()}
 
 
 class ReviewBody(BaseModel):

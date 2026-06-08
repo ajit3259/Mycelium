@@ -90,6 +90,11 @@ export async function postReview(id: number, rating: 'got_it' | 'again'): Promis
   })
 }
 
+export async function getReviewHistory(): Promise<{ reviewed_dates: string[]; streak: number }> {
+  const r = await fetch('/review/history')
+  return r.json()
+}
+
 export async function searchCaptures(q: string, limit = 20): Promise<Capture[]> {
   const r = await fetch(`/search?q=${encodeURIComponent(q)}&limit=${limit}`)
   return r.json()
