@@ -255,16 +255,24 @@ def search_captures(q: str, limit=20) -> list:
         return result
 
 
-def get_brief(limit=12) -> list:
-    """Recent unreviewed captures grouped by intent for digest view."""
+def get_brief(limit=50, date: str = None) -> list:
+    """Captures for digest view. date='YYYY-MM-DD' fetches ALL captures for that day, else recent unreviewed."""
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row
-        rows = conn.execute("""
-            SELECT * FROM captures
-            WHERE summary IS NOT NULL AND reviewed = 0
-            ORDER BY created_at DESC
-            LIMIT ?
-        """, (limit,)).fetchall()
+        if date:
+            rows = conn.execute("""
+                SELECT * FROM captures
+                WHERE summary IS NOT NULL
+                  AND date(created_at) = ?
+                ORDER BY created_at DESC
+            """, (date,)).fetchall()
+        else:
+            rows = conn.execute("""
+                SELECT * FROM captures
+                WHERE summary IS NOT NULL AND reviewed = 0
+                ORDER BY created_at DESC
+                LIMIT ?
+            """, (limit,)).fetchall()
         result = []
         for r in rows:
             d = dict(r)
@@ -273,3 +281,17 @@ def get_brief(limit=12) -> list:
             d.pop("embedding", None)
             result.append(d)
         return result
+
+
+def get_brief_dates(limit=30) -> list:
+    """Return distinct dates that have captures, newest first."""
+    with sqlite3.connect(DB_PATH) as conn:
+        rows = conn.execute("""
+            SELECT date(created_at) as day, COUNT(*) as count
+            FROM captures
+            WHERE summary IS NOT NULL
+            GROUP BY day
+            ORDER BY day DESC
+            LIMIT ?
+        """, (limit,)).fetchall()
+        return [{"date": r[0], "count": r[1]} for r in rows]

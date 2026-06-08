@@ -1,14 +1,48 @@
 import { useState, useEffect } from 'react'
 import type { Capture } from '../types'
-import { getBrief } from '../api'
+import { getBrief, getBriefDates } from '../api'
 import { Card } from './Card'
 
-const GROUP_LABELS: Record<string, { reason: string; accent: string }> = {
-  learn:     { reason: 'Things you\'re learning', accent: 'var(--learn)' },
-  act:       { reason: 'Actions you keep meaning to take', accent: 'var(--act)' },
-  reference: { reason: 'References worth a second look', accent: 'var(--ref)' },
-  ephemeral: { reason: 'Fleeting thoughts', accent: 'var(--eph)' },
-  other:     { reason: 'Other captures', accent: 'var(--paper)' },
+const INTENT_ACCENT: Record<string, string> = {
+  learn:     'var(--learn)',
+  act:       'var(--act)',
+  reference: 'var(--ref)',
+  ephemeral: 'var(--eph)',
+  other:     'var(--paper)',
+}
+
+const INTENT_VERB: Record<string, string> = {
+  learn:     'Learning',
+  act:       'To do',
+  reference: 'Reference',
+  ephemeral: 'Fleeting',
+  other:     'Other',
+}
+
+function groupReason(intent: string, items: Capture[]): string {
+  // pull top tags across items, deduplicated
+  const tagCounts: Record<string, number> = {}
+  for (const c of items) {
+    for (const t of c.tags ?? []) {
+      tagCounts[t] = (tagCounts[t] ?? 0) + 1
+    }
+  }
+  const topTags = Object.entries(tagCounts)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 3)
+    .map(([t]) => t)
+
+  const verb = INTENT_VERB[intent] ?? 'Other'
+  return topTags.length > 0 ? `${verb}: ${topTags.join(', ')}` : verb
+}
+
+function formatDate(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+function isToday(dateStr: string): boolean {
+  return dateStr === new Date().toISOString().slice(0, 10)
 }
 
 interface Props {
@@ -16,36 +50,81 @@ interface Props {
 }
 
 export function BriefScreen({ onPick }: Props) {
+  const [dates, setDates] = useState<{ date: string; count: number }[]>([])
+  const [selectedDate, setSelectedDate] = useState<string | null>(null)
   const [grouped, setGrouped] = useState<Record<string, Capture[]>>({})
   const [loading, setLoading] = useState(true)
   const [read, setRead] = useState(false)
 
+  // Load available dates on mount
   useEffect(() => {
-    getBrief()
-      .then(g => { setGrouped(g); setLoading(false) })
-      .catch(() => { setGrouped({}); setLoading(false) })
+    getBriefDates().then(setDates).catch(() => {})
   }, [])
 
-  const today = new Date()
-  const dateLabel = today.toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
-  const totalItems = Object.values(grouped).reduce((n, arr) => n + arr.length, 0)
+  // Load brief whenever selectedDate changes (null = today's unreviewed)
+  useEffect(() => {
+    setLoading(true)
+    setRead(false)
+    getBrief(selectedDate ?? undefined)
+      .then(g => { setGrouped(g); setLoading(false) })
+      .catch(() => { setGrouped({}); setLoading(false) })
+  }, [selectedDate])
 
+  const today = new Date().toISOString().slice(0, 10)
+  const activeDate = selectedDate ?? today
+  const dateLabel = isToday(activeDate)
+    ? new Date().toLocaleDateString('en-US', { weekday: 'short', day: '2-digit', month: 'short', year: 'numeric' }).toUpperCase()
+    : formatDate(activeDate).toUpperCase()
+
+  const totalItems = Object.values(grouped).reduce((n, arr) => n + arr.length, 0)
   const intentOrder = ['learn', 'act', 'reference', 'ephemeral', 'other']
   const groups = intentOrder
-    .filter(k => grouped[k] && grouped[k].length > 0)
-    .map(k => ({ key: k, items: grouped[k], ...GROUP_LABELS[k] }))
-
-  if (loading) return (
-    <div style={{ flex: 1, display: 'grid', placeItems: 'center' }}>
-      <span className="font-mono" style={{ color: 'var(--ink-soft)', fontSize: 13, fontWeight: 700 }}>Loading brief…</span>
-    </div>
-  )
+    .filter(k => grouped[k]?.length > 0)
+    .map(k => ({ key: k, items: grouped[k], accent: INTENT_ACCENT[k], reason: groupReason(k, grouped[k]) }))
 
   return (
     <div style={{ flex: 1, overflowY: 'auto', padding: '28px 30px', position: 'relative' }}>
       <div style={{ maxWidth: 760, margin: '0 auto' }}>
 
-        {/* cover card */}
+        {/* Date strip */}
+        {dates.length > 1 && (
+          <div style={{
+            display: 'flex', gap: 6, overflowX: 'auto', marginBottom: 20,
+            paddingBottom: 4,
+          }}>
+            {/* Today pill (unreviewed) */}
+            <button
+              onClick={() => setSelectedDate(null)}
+              className="font-mono"
+              style={{
+                flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                padding: '5px 12px', border: '2.5px solid var(--line)',
+                background: selectedDate === null ? 'var(--ink)' : 'var(--card)',
+                color: selectedDate === null ? 'var(--paper)' : 'var(--ink)',
+                cursor: 'pointer', boxShadow: selectedDate === null ? 'none' : '2px 2px 0 var(--line)',
+              }}
+            >Today</button>
+            {dates.map(d => (
+              <button
+                key={d.date}
+                onClick={() => setSelectedDate(d.date)}
+                className="font-mono"
+                style={{
+                  flexShrink: 0, fontSize: 10, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase',
+                  padding: '5px 12px', border: '2.5px solid var(--line)',
+                  background: selectedDate === d.date ? 'var(--ink)' : 'var(--card)',
+                  color: selectedDate === d.date ? 'var(--paper)' : 'var(--ink)',
+                  cursor: 'pointer', boxShadow: selectedDate === d.date ? 'none' : '2px 2px 0 var(--line)',
+                }}
+              >
+                {formatDate(d.date)}
+                <span style={{ marginLeft: 5, opacity: 0.5 }}>{d.count}</span>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {/* Cover card */}
         <div style={{
           background: 'var(--ink)', color: 'var(--paper)',
           border: 'var(--bw) solid var(--line)', boxShadow: 'var(--shadow)',
@@ -56,27 +135,46 @@ export function BriefScreen({ onPick }: Props) {
             <div className="font-mono" style={{ fontSize: 12, letterSpacing: '0.18em', color: 'var(--learn)', fontWeight: 700 }}>
               {dateLabel}
             </div>
-            <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 6 }}>Daily Brief</div>
+            <div style={{ fontSize: 34, fontWeight: 700, letterSpacing: '-0.02em', marginTop: 6 }}>
+              {selectedDate === null ? 'Daily Brief' : 'Past Brief'}
+            </div>
+            {selectedDate === null && (
+              <div className="font-mono" style={{ fontSize: 10, opacity: 0.5, marginTop: 4, letterSpacing: '0.1em' }}>
+                UNREVIEWED CAPTURES
+              </div>
+            )}
           </div>
           <div style={{ textAlign: 'right' }}>
-            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: 'var(--learn)' }}>{totalItems}</div>
-            <div className="font-mono" style={{ fontSize: 11, letterSpacing: '0.1em', opacity: 0.8 }}>TO REVISIT</div>
+            <div style={{ fontSize: 40, fontWeight: 700, lineHeight: 1, color: 'var(--learn)' }}>{loading ? '—' : totalItems}</div>
+            <div className="font-mono" style={{ fontSize: 11, letterSpacing: '0.1em', opacity: 0.8 }}>CAPTURES</div>
           </div>
         </div>
 
-        {/* groups */}
-        {groups.length === 0 && (
-          <div style={{ textAlign: 'center', padding: '60px 0', opacity: 0.6 }}>
-            <div style={{ fontSize: 40 }}>◎</div>
-            <p style={{ fontWeight: 500, marginTop: 8 }}>Your brief is empty. Capture something first.</p>
+        {loading && (
+          <div style={{ textAlign: 'center', padding: '40px 0', opacity: 0.5 }}>
+            <span className="font-mono" style={{ fontSize: 12, fontWeight: 700, letterSpacing: '0.1em' }}>Loading…</span>
           </div>
         )}
 
-        {groups.map(g => (
+        {!loading && groups.length === 0 && (
+          <div style={{ textAlign: 'center', padding: '60px 0', opacity: 0.6 }}>
+            <div style={{ fontSize: 40 }}>◎</div>
+            <p style={{ fontWeight: 500, marginTop: 8 }}>
+              {selectedDate ? 'No captures found for this date.' : 'All caught up — nothing unreviewed.'}
+            </p>
+          </div>
+        )}
+
+        {!loading && groups.map(g => (
           <section key={g.key} style={{ marginBottom: 26 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
               <span style={{ width: 16, height: 16, background: g.accent, border: '2.5px solid var(--line)', flexShrink: 0 }} />
-              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>{g.reason}</h3>
+              <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700, letterSpacing: '-0.01em', color: 'var(--ink)' }}>
+                {g.reason}
+              </h3>
+              <span className="font-mono" style={{ fontSize: 10, color: 'var(--ink-soft)', fontWeight: 700, marginLeft: 'auto' }}>
+                {g.items.length}
+              </span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 11 }}>
               {g.items.map(c => (
@@ -86,8 +184,8 @@ export function BriefScreen({ onPick }: Props) {
           </section>
         ))}
 
-        {/* read button */}
-        {groups.length > 0 && (
+        {/* Mark read — only for today's brief */}
+        {!loading && groups.length > 0 && selectedDate === null && (
           <div style={{ display: 'flex', justifyContent: 'center', marginTop: 30, marginBottom: 10 }}>
             <button
               onClick={() => setRead(true)}

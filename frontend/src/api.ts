@@ -95,8 +95,14 @@ export async function searchCaptures(q: string, limit = 20): Promise<Capture[]> 
   return r.json()
 }
 
-export async function getBrief(): Promise<Record<string, Capture[]>> {
-  const r = await fetch('/brief')
+export async function getBrief(date?: string): Promise<Record<string, Capture[]>> {
+  const url = date ? `/brief?date=${encodeURIComponent(date)}` : '/brief'
+  const r = await fetch(url)
+  return r.json()
+}
+
+export async function getBriefDates(): Promise<{ date: string; count: number }[]> {
+  const r = await fetch('/brief/dates')
   return r.json()
 }
 

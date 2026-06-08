@@ -17,7 +17,7 @@ from db import (
     init_db, save_capture, update_capture, get_captures, get_surfaceable,
     mark_surfaced, mark_done, get_all_embeddings, get_captures_by_ids,
     delete_capture, patch_capture, get_review_queue, record_review,
-    search_captures, get_brief, get_captures_by_intent,
+    search_captures, get_brief, get_brief_dates, get_captures_by_intent,
 )
 from lm import process_text, process_link, process_image, embed, find_related, generate_recall_question, synthesize_answer, generate_extend
 from surface import pick
@@ -249,9 +249,13 @@ async def ask_extend(body: ExtendBody):
 
 # ── brief ──────────────────────────────────────────────────────────────────────
 
+@app.get("/brief/dates")
+async def brief_dates():
+    return get_brief_dates()
+
 @app.get("/brief")
-async def brief(limit: int = 12):
-    items = get_brief(limit)
+async def brief(limit: int = 50, date: Optional[str] = None):
+    items = get_brief(limit, date=date)
     grouped: dict[str, list] = {}
     for item in items:
         key = item.get("intent") or "other"
