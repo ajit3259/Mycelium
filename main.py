@@ -438,6 +438,8 @@ async def _process(cid: int, type: str, **kwargs):
             return
 
         summary = result.get("summary") or ""
+        if not summary:
+            raise ValueError("LM returned empty summary")
         claims = result.get("claims") or []
         title = result.get("title") or ""
         intent = result.get("intent")

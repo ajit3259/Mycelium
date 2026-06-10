@@ -380,12 +380,19 @@ else:
         img = _PILImage.open(file_path).convert("RGB")
         if max(img.width, img.height) > 768:
             img.thumbnail((768, 768), _PILImage.LANCZOS)
-        # Match inputs to wherever the model actually is (ZeroGPU may or may not have moved it)
+        # Qwen2.5-VL requires chat-template format with explicit image content blocks
+        messages = [{"role": "user", "content": [
+            {"type": "image", "image": img},
+            {"type": "text", "text": text_prompt},
+        ]}]
+        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         device = next(vl_model.parameters()).device
-        inputs = processor(text=text_prompt, images=img, return_tensors="pt").to(device)
+        inputs = processor(text=[text], images=[img], return_tensors="pt").to(device)
+        input_len = inputs["input_ids"].shape[1]
         with torch.no_grad():
             out = vl_model.generate(**inputs, max_new_tokens=256)
-        return processor.decode(out[0], skip_special_tokens=True)
+        # Slice off the prompt tokens, decode only the generated part
+        return processor.decode(out[0][input_len:], skip_special_tokens=True)
 
 
 # ══════════════════════════════════════════════════════════════════════════════
