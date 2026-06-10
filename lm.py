@@ -292,7 +292,7 @@ if USE_LM_STUDIO:
 
 else:
     import torch
-    from transformers import pipeline, AutoProcessor, AutoModelForCausalLM, Qwen2_5_VLForConditionalGeneration
+    from transformers import pipeline, AutoProcessor, AutoModelForCausalLM
     from sentence_transformers import SentenceTransformer
 
     _text_pipe = None
@@ -364,12 +364,16 @@ else:
     @_gpu
     def _chat_image(file_path: str, text_prompt: str) -> str:
         from PIL import Image as _PILImage
+        try:
+            from transformers import Qwen2_5_VLForConditionalGeneration as _VLCls
+        except ImportError:
+            _VLCls = AutoModelForCausalLM
         global _vl_pipe
         if _vl_pipe is None:
             print(f"[lm] Loading VL model {HF_VL_MODEL}…")
             _processor = AutoProcessor.from_pretrained(HF_VL_MODEL)
-            _vl_model_inst = Qwen2_5_VLForConditionalGeneration.from_pretrained(
-                HF_VL_MODEL, dtype=torch.bfloat16,
+            _vl_model_inst = _VLCls.from_pretrained(
+                HF_VL_MODEL, torch_dtype=torch.bfloat16,
             )
             _vl_pipe = (_processor, _vl_model_inst)
         processor, vl_model = _vl_pipe
