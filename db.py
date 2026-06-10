@@ -204,6 +204,7 @@ def get_review_queue(limit=10) -> list:
             SELECT * FROM captures
             WHERE intent = 'learn'
               AND summary IS NOT NULL
+              AND recall_question IS NOT NULL
               AND (
                 review_due_at IS NULL
                 OR review_due_at <= datetime('now', 'localtime')

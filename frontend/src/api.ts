@@ -64,8 +64,9 @@ export async function markSkip(id: number): Promise<void> {
   await fetch(`/surface/${id}/skip`, { method: 'POST' })
 }
 
-export async function deleteCapture(id: number): Promise<void> {
-  await fetch(`/captures/${id}`, { method: 'DELETE' })
+export async function deleteCapture(id: number): Promise<boolean> {
+  const res = await fetch(`/captures/${id}`, { method: 'DELETE' })
+  return res.ok
 }
 
 export async function logEvent(event: LogEvent): Promise<void> {

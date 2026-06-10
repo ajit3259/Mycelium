@@ -66,8 +66,8 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
 
   async function handleDismiss(e: React.MouseEvent) {
     e.stopPropagation()
-    await deleteCapture(capture.id)
-    onDelete?.(capture.id)
+    const ok = await deleteCapture(capture.id)
+    if (ok) onDelete?.(capture.id)
   }
 
   const intentBg = (capture.intent ? INTENT_BG[capture.intent] : null) ?? '#eee'
