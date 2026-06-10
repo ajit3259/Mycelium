@@ -380,7 +380,9 @@ else:
         img = _PILImage.open(file_path).convert("RGB")
         if max(img.width, img.height) > 768:
             img.thumbnail((768, 768), _PILImage.LANCZOS)
-        inputs = processor(text=text_prompt, images=img, return_tensors="pt").to("cuda")
+        # Match inputs to wherever the model actually is (ZeroGPU may or may not have moved it)
+        device = next(vl_model.parameters()).device
+        inputs = processor(text=text_prompt, images=img, return_tensors="pt").to(device)
         with torch.no_grad():
             out = vl_model.generate(**inputs, max_new_tokens=256)
         return processor.decode(out[0], skip_special_tokens=True)

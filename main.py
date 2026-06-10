@@ -449,7 +449,16 @@ async def _process(cid: int, type: str, **kwargs):
         update_capture(cid, summary, result.get("tags", []), intent, emb, related, recall_q, claims, source_content_path, title)
 
     except Exception as e:
-        print(f"[process error] {e}")
+        print(f"[process error] cid={cid} {e}")
+        import sqlite3
+        try:
+            with sqlite3.connect(DB_PATH) as conn:
+                conn.execute(
+                    "UPDATE captures SET summary=?, intent='ephemeral' WHERE id=? AND summary IS NULL",
+                    ("⚠ Processing failed — delete and retry", cid)
+                )
+        except Exception:
+            pass
 
 
 async def _fetch_page(url: str) -> tuple[str, str]:
