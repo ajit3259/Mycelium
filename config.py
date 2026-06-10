@@ -9,8 +9,9 @@ UPLOADS_DIR = Path(os.getenv("UPLOADS_DIR", str(_data_dir / "uploads")))
 
 SCREENSHOTS_DIR = os.getenv("SCREENSHOTS_DIR", str(Path.home() / "Desktop"))
 
-# PATH A — LM Studio (local dev). Set LM_STUDIO_URL="" to switch to PATH B.
-LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", "http://localhost:1234/v1")
+# PATH A — LM Studio (local dev). Auto-disabled on HF Spaces (SPACE_ID is set there).
+_default_lm_url = "" if os.getenv("SPACE_ID") else "http://localhost:1234/v1"
+LM_STUDIO_URL = os.getenv("LM_STUDIO_URL", _default_lm_url)
 LM_MODEL = os.getenv("LM_MODEL", "")
 
 # PATH B — HF Transformers (used when LM_STUDIO_URL is not set)
