@@ -21,5 +21,6 @@ export default defineConfig({
   build: {
     outDir: '../static',
     emptyOutDir: true,
+    assetsDir: '_app',  // avoid collision with Gradio's /assets/ mount on HF Space
   },
 })
