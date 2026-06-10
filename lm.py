@@ -292,10 +292,9 @@ if USE_LM_STUDIO:
 
 else:
     import torch
-    from transformers import pipeline, BitsAndBytesConfig
+    from transformers import pipeline, AutoProcessor, AutoModelForCausalLM, Qwen2_5_VLForConditionalGeneration
     from sentence_transformers import SentenceTransformer
 
-    _bnb_config = BitsAndBytesConfig(load_in_4bit=True)
     _text_pipe = None
     _embed_model_inst = None
     _vl_pipe = None
@@ -312,14 +311,14 @@ else:
             return _spaces.GPU(duration=120)(fn)
         return fn
 
+    # Load text model to CPU at startup — ZeroGPU moves it to GPU per @_gpu call
     def _get_text_pipe():
         global _text_pipe
         if _text_pipe is None:
             print(f"[lm] Loading {HF_MODEL}…")
             _text_pipe = pipeline(
                 "text-generation", model=HF_MODEL,
-                dtype=torch.bfloat16, device_map="auto",
-                model_kwargs={"quantization_config": _bnb_config},
+                torch_dtype=torch.bfloat16,
             )
             print("[lm] Model ready")
         return _text_pipe
@@ -328,7 +327,7 @@ else:
         global _embed_model_inst
         if _embed_model_inst is None:
             print(f"[lm] Loading {EMBED_MODEL}…")
-            _embed_model_inst = SentenceTransformer(EMBED_MODEL)
+            _embed_model_inst = SentenceTransformer(EMBED_MODEL, device="cpu")
             print("[lm] Embeddings ready")
         return _embed_model_inst
 
@@ -352,6 +351,7 @@ else:
         out = pipe(messages, max_new_tokens=512, do_sample=False)
         return _extract_assistant(out)
 
+    # Embeddings run on CPU — fast enough, saves GPU quota
     def embed(text: str) -> list:
         try:
             model = _get_embed_model()
@@ -364,21 +364,19 @@ else:
     @_gpu
     def _chat_image(file_path: str, text_prompt: str) -> str:
         from PIL import Image as _PILImage
-        from transformers import AutoProcessor, AutoModelForCausalLM
         global _vl_pipe
         if _vl_pipe is None:
             print(f"[lm] Loading VL model {HF_VL_MODEL}…")
             _processor = AutoProcessor.from_pretrained(HF_VL_MODEL)
-            _vl_model_inst = AutoModelForCausalLM.from_pretrained(
-                HF_VL_MODEL, torch_dtype=torch.bfloat16,
-                device_map="auto", quantization_config=_bnb_config,
+            _vl_model_inst = Qwen2_5_VLForConditionalGeneration.from_pretrained(
+                HF_VL_MODEL, dtype=torch.bfloat16,
             )
             _vl_pipe = (_processor, _vl_model_inst)
         processor, vl_model = _vl_pipe
         img = _PILImage.open(file_path).convert("RGB")
         if max(img.width, img.height) > 768:
             img.thumbnail((768, 768), _PILImage.LANCZOS)
-        inputs = processor(text=text_prompt, images=img, return_tensors="pt").to(vl_model.device)
+        inputs = processor(text=text_prompt, images=img, return_tensors="pt").to("cuda")
         with torch.no_grad():
             out = vl_model.generate(**inputs, max_new_tokens=256)
         return processor.decode(out[0], skip_special_tokens=True)
