@@ -361,6 +361,27 @@ else:
             print(f"[lm] embed error: {e}")
             return []
 
+    def _make_vl_inputs(processor, img, text_prompt: str, device):
+        """Build processor inputs in whatever format this VL model expects.
+
+        Modern models (Qwen2.5-VL, InternVL, …) expose apply_chat_template and
+        need explicit image content blocks in the messages list.  Older models
+        (BLIP-2, early LLaVA) accept a plain text + images call.  Try the
+        standard chat-template path first; fall back to the simple form.
+        """
+        if hasattr(processor, "apply_chat_template"):
+            try:
+                messages = [{"role": "user", "content": [
+                    {"type": "image", "image": img},
+                    {"type": "text", "text": text_prompt},
+                ]}]
+                text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
+                return processor(text=[text], images=[img], return_tensors="pt").to(device), True
+            except Exception:
+                pass
+        # Fallback: plain text + image (works for BLIP-2, older LLaVA, etc.)
+        return processor(text=text_prompt, images=img, return_tensors="pt").to(device), False
+
     @_gpu
     def _chat_image(file_path: str, text_prompt: str) -> str:
         from PIL import Image as _PILImage
@@ -380,18 +401,11 @@ else:
         img = _PILImage.open(file_path).convert("RGB")
         if max(img.width, img.height) > 768:
             img.thumbnail((768, 768), _PILImage.LANCZOS)
-        # Qwen2.5-VL requires chat-template format with explicit image content blocks
-        messages = [{"role": "user", "content": [
-            {"type": "image", "image": img},
-            {"type": "text", "text": text_prompt},
-        ]}]
-        text = processor.apply_chat_template(messages, tokenize=False, add_generation_prompt=True)
         device = next(vl_model.parameters()).device
-        inputs = processor(text=[text], images=[img], return_tensors="pt").to(device)
-        input_len = inputs["input_ids"].shape[1]
+        inputs, used_template = _make_vl_inputs(processor, img, text_prompt, device)
+        input_len = inputs["input_ids"].shape[1] if used_template else 0
         with torch.no_grad():
             out = vl_model.generate(**inputs, max_new_tokens=256)
-        # Slice off the prompt tokens, decode only the generated part
         return processor.decode(out[0][input_len:], skip_special_tokens=True)
 
 
