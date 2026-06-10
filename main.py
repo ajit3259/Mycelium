@@ -31,8 +31,6 @@ from lm import (
 from surface import pick
 
 app = FastAPI()
-UPLOADS_DIR.mkdir(exist_ok=True)
-CONTENT_DIR.mkdir(exist_ok=True)
 
 
 @app.api_route("/api/watch", methods=["GET", "POST", "OPTIONS"])
@@ -42,7 +40,30 @@ async def api_watch():
 
 @app.on_event("startup")
 async def startup():
+    UPLOADS_DIR.mkdir(parents=True, exist_ok=True)
+    CONTENT_DIR.mkdir(exist_ok=True)
     init_db()
+    from db import get_captures as _gc
+    if len(_gc(limit=1)) == 0:
+        try:
+            import seed
+            seed.run()
+        except Exception as e:
+            print(f"[seed] {e}")
+    else:
+        try:
+            from db import get_all_embeddings, get_captures as _gc2, update_capture
+            from lm import find_related
+            all_embs = get_all_embeddings()
+            for c in _gc2(limit=2000):
+                emb_row = next((e for cid, e in all_embs if cid == c["id"]), None)
+                if not emb_row:
+                    continue
+                related = find_related(emb_row, all_embs, exclude_id=c["id"])
+                update_capture(c["id"], c["summary"], c.get("tags", []), c.get("intent"), emb_row, related)
+            print(f"[startup] related_ids backfill complete ({len(all_embs)} captures)")
+        except Exception as e:
+            print(f"[startup backfill] {e}")
 
 
 # ── capture endpoints ──────────────────────────────────────────────────────────

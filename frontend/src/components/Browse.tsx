@@ -58,8 +58,6 @@ function CalendarHeatmap({
     return result
   }, [])
 
-  const [tooltip, setTooltip] = useState<{ date: string; count: number } | null>(null)
-
   const SZ = 14
   const GAP = 3
 
@@ -101,8 +99,6 @@ function CalendarHeatmap({
                       key={i}
                       title={`${date} · ${count} capture${count !== 1 ? 's' : ''}`}
                       onClick={() => onSelectDate(isSelected ? null : date)}
-                      onMouseEnter={() => count > 0 && setTooltip({ date, count })}
-                      onMouseLeave={() => setTooltip(null)}
                       style={{
                         width: SZ, height: SZ,
                         background: count === 0 ? 'var(--card)' : `var(--learn)`,
