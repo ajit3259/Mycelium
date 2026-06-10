@@ -42,7 +42,7 @@ export function CaptureBar({ onCapture }: Props) {
       } else if (tab === 'link' && link.trim()) {
         res = await captureLink(link.trim(), yourTake); setLink(''); setYourTake('')
       } else if (tab === 'image' && file) {
-        res = await captureImage(file, caption, yourTake); setFile(null); setCaption(''); setYourTake('')
+        res = await captureImage(file, caption, yourTake); setFile(null); setCaption(''); setYourTake(''); if (fileInputRef.current) fileInputRef.current.value = ''
       } else return
       if (res) onCapture(res.id)
     } finally {
@@ -171,7 +171,7 @@ export function CaptureBar({ onCapture }: Props) {
                     ✓ {file.name}
                   </p>
                   <button
-                    onClick={() => { setFile(null); setCaption('') }}
+                    onClick={() => { setFile(null); setCaption(''); if (fileInputRef.current) fileInputRef.current.value = '' }}
                     className="font-mono"
                     style={{ fontSize: 10, fontWeight: 700, color: 'var(--ink-soft)', textDecoration: 'underline', background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
                   >
