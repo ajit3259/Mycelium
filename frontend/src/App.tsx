@@ -133,6 +133,7 @@ export default function App() {
   // Pending capture ID — poll until processing completes
   const pendingIdRef = useRef<number | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const shownGuessIds = useRef<Set<number>>(new Set())
 
   function startPolling(id: number) {
     pendingIdRef.current = id
@@ -141,12 +142,32 @@ export default function App() {
       const all = await getCaptures(50).catch(() => [])
       const found = all.find(c => c.id === pendingIdRef.current)
       if (found?.summary && found?.intent) {
-        setPendingGuess(found)
+        if (!shownGuessIds.current.has(found.id)) {
+          shownGuessIds.current.add(found.id)
+          setPendingGuess(found)
+        }
         pendingIdRef.current = null
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       }
     }, 3000)
   }
+
+  // On load: surface AgentGuess for any capture processed in the last 2 min
+  // that hasn't been confirmed yet (handles page refresh mid-processing)
+  useEffect(() => {
+    getCaptures(50).then(all => {
+      const twoMinsAgo = new Date(Date.now() - 2 * 60 * 1000).toISOString().replace('T', ' ').slice(0, 19)
+      const missed = all.find(c =>
+        c.summary && c.intent && !c.summary.startsWith('⚠') &&
+        c.created_at && c.created_at >= twoMinsAgo &&
+        !shownGuessIds.current.has(c.id)
+      )
+      if (missed) {
+        shownGuessIds.current.add(missed.id)
+        setPendingGuess(missed)
+      }
+    }).catch(() => {})
+  }, [])
 
   useEffect(() => () => { if (pollRef.current) clearInterval(pollRef.current) }, [])
 
