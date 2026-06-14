@@ -2,7 +2,10 @@
 __pycache__/
 *.pyc
 mind.db
+mind.db.local-backup
 uploads/
+hf_assets/
 .env
 *.egg-info/
 .DS_Store
+.claude/

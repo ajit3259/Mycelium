@@ -4,57 +4,54 @@
 
 ![Mycelium UI](assets/image.png)
 
+🚀 **[Live demo](https://huggingface.co/spaces/build-small-hackathon/mycelium)** · 📹 **[Demo video](https://www.youtube.com/watch?v=Kr7LxRm0JBs)** · 📓 **[Field Notes](https://huggingface.co/blog/build-small-hackathon/mycelium)**
+
 ---
 
 ## The Problem
 
-Personal knowledge is broken at the retrieval end, not the capture end. People save articles, take screenshots, bookmark links, and write notes constantly — but nothing brings it back. Saved things become graveyards. The forgetting curve wins.
+Everyone saves things. Nobody revisits them. Screenshots, bookmarks, notes-to-self — all gone dark in a week. The capture habit exists. The recall loop doesn't.
 
-Three specific failures:
-1. **Scattered capture** — text in Keep, links in Pocket, screenshots in Camera Roll, no unified signal
-2. **No recall** — nothing surfaces saved content at the right time, in the right mood
-3. **No connections** — two related ideas captured months apart never meet
+Mycelium fixes the recall loop.
+
+---
+
+## What It Does
+
+- **Capture** — notes, links, images. Each processed by a local LLM into a structured summary with intent classification (`learn` / `act` / `reference` / `ephemeral`) and semantic tags.
+- **ASK** — semantic search across your knowledge base with LLM synthesis, gap analysis, Feynman self-testing, and learning arc.
+- **BRIEF** — daily digest with synthesis across captures and a weekly thread showing how your thinking evolved.
+- **REVIEW** — spaced repetition (SM-2) targeting specific claims from your own notes — not generic flashcards.
+- **GRAPH** — visual map of how your ideas connect via embedding similarity.
 
 ---
 
 ## How It Works
 
 ```
-Capture → Enrich (local LLM) → Store → Connect (embeddings) → Surface → Feedback
+Capture → LLM enrichment → Embed → Connect → Surface → Review
 ```
 
-1. **Capture** — paste text, drop a URL, or upload an image
-2. **Enrich** — a local LLM (LM Studio / Gemma 4B) extracts a summary, tags, and intent (`learn` / `act` / `reference` / `ephemeral`)
-3. **Connect** — semantic embeddings find related captures across modalities
-4. **Surface** — spaced repetition + intent scoring brings the right item back at the right time
-5. **Feedback** — Done/Skip signals tune what resurfaces; skip streaks trigger re-enrichment
+1. Paste text, drop a URL, or upload an image
+2. Local LLM extracts summary, tags, intent, claims, and a recall question
+3. `BAAI/bge-base-en-v1.5` embeds the summary into a 768-dim vector
+4. Related captures link automatically via cosine similarity
+5. Surface engine resurfaces the right item at the right time via intent + recency scoring
+6. Spaced repetition (SM-2) schedules review of what you should remember
 
-Everything runs locally. No cloud, no subscriptions, no data leaving your machine.
+Everything runs locally. No cloud APIs, no data leaving your machine.
 
 ---
 
 ## Stack
 
-| Layer | Tech |
-|---|---|
-| Backend | FastAPI + SQLite + Python |
-| LLM inference | LM Studio (OpenAI-compat API) |
-| Model | `google/gemma-4-e4b` (4B, vision) |
-| Embeddings | `text-embedding-nomic-embed-text-v1.5` (768-dim) |
-| Frontend | React + TypeScript + Vite + Tailwind CSS |
-| Design | Neobrutalism — Space Grotesk + JetBrains Mono |
-
----
-
-## Features
-
-- **Three capture modes** — note, link, image (with preview + optional caption)
-- **Local LLM enrichment** — summary, tags, intent classification, all on-device
-- **Semantic connections** — cosine similarity over nomic embeddings surfaces related captures
-- **Spaced repetition surfacing** — intent-weighted scoring with novelty and age bonuses
-- **Browse & filter** — filter by intent (learn/act/reference/ephemeral) and type, full-text search
-- **Click to surface** — click any feed card to pull it into the surface panel with connections
-- **Image resize** — images downscaled to 768px before LLM to stay within context limits
+| Layer | Local dev | HF Space |
+|---|---|---|
+| Backend | FastAPI + SQLite | FastAPI + SQLite + Gradio (ZeroGPU) |
+| LLM | LM Studio (OpenAI-compat) | `nvidia/Nemotron-Mini-4B-Instruct` |
+| Vision | LM Studio (multimodal) | `Qwen/Qwen2.5-VL-7B-Instruct` |
+| Embeddings | `BAAI/bge-base-en-v1.5` | `BAAI/bge-base-en-v1.5` |
+| Frontend | React + TypeScript + Vite + Tailwind CSS | Same (served by FastAPI) |
 
 ---
 
@@ -64,7 +61,7 @@ Everything runs locally. No cloud, no subscriptions, no data leaving your machin
 
 - Python 3.11+
 - Node 18+
-- [LM Studio](https://lmstudio.ai) with `google/gemma-4-e4b` and `text-embedding-nomic-embed-text-v1.5` loaded
+- [LM Studio](https://lmstudio.ai) with a chat model and `BAAI/bge-base-en-v1.5` loaded
 
 ### Backend
 
@@ -74,7 +71,7 @@ source .venv/bin/activate
 pip install -r requirements.txt
 
 python -c "from db import init_db; init_db()"
-uvicorn main:app --reload
+uvicorn main:app --port 8000
 ```
 
 ### Frontend (dev)
@@ -95,18 +92,27 @@ npm run build
 
 Open [http://localhost:8000](http://localhost:8000).
 
+### Seed data (optional)
+
+```bash
+python seed.py  # populates 22 engineering captures across a week
+```
+
 ---
 
 ## Project Structure
 
 ```
 .
-├── main.py          # FastAPI app — all endpoints
-├── lm.py            # LLM + embedding calls (LM Studio)
-├── db.py            # SQLite schema + queries
-├── surface.py       # Spaced repetition scoring + pick logic
-├── config.py        # LM Studio URL, model names, paths
+├── main.py          # FastAPI app — all API endpoints
+├── lm.py            # Unified LLM interface (LM Studio + HF Transformers)
+├── db.py            # SQLite schema + all queries
+├── surface.py       # Intent-weighted surfacing + pick logic
+├── config.py        # Model names, paths, auto-detects HF Spaces
+├── seed.py          # Demo seed data (22 engineering captures)
 ├── requirements.txt
+├── FIELD_NOTES.md   # Build post-mortem
+├── DESIGN.md        # Architecture decisions
 ├── frontend/        # React + TypeScript + Vite
 │   └── src/
 │       ├── App.tsx
@@ -114,18 +120,16 @@ Open [http://localhost:8000](http://localhost:8000).
 │       ├── types.ts
 │       └── components/
 │           ├── CaptureBar.tsx
-│           ├── SurfacePanel.tsx
-│           ├── Feed.tsx
-│           ├── Browse.tsx
-│           └── Card.tsx
-├── assets/          # Screenshots and media for README
-├── storage/         # Raw content files (created at runtime)
-├── static/          # Built frontend (served by FastAPI)
-└── DESIGN.md        # Full architecture + tradeoffs
+│           ├── Feed.tsx, Browse.tsx, Card.tsx
+│           ├── AskScreen.tsx
+│           ├── BriefScreen.tsx
+│           ├── ReviewScreen.tsx
+│           └── GraphView.tsx
+└── static/          # Built frontend (served by FastAPI)
 ```
 
 ---
 
-## Submitted to
+---
 
-[HuggingFace Build Small Hackathon](https://huggingface.co/spaces/huggingface-projects/build-small-hackathon) — Track 1: Backyard AI
+Built by [@ajit3259](https://github.com/ajit3259) · Submitted to [Build Small Hackathon 2026](https://huggingface.co/spaces/build-small-hackathon)
