@@ -240,8 +240,16 @@ def _build_take_section(your_take: str) -> str:
 if USE_LM_STUDIO:
     from openai import OpenAI
     from PIL import Image as _PILImage
+    from sentence_transformers import SentenceTransformer as _ST
 
     _client = OpenAI(base_url=LM_STUDIO_URL, api_key="lm-studio")
+    _embed_model_inst_a = None
+
+    def _get_embed_model_a():
+        global _embed_model_inst_a
+        if _embed_model_inst_a is None:
+            _embed_model_inst_a = _ST(EMBED_MODEL, device="cpu")
+        return _embed_model_inst_a
 
     def _lm_model():
         if LM_MODEL:
@@ -263,10 +271,9 @@ if USE_LM_STUDIO:
 
     def embed(text: str) -> list:
         try:
-            resp = _client.embeddings.create(
-                model="BAAI/bge-base-en-v1.5", input=text[:2000]
-            )
-            return resp.data[0].embedding
+            model = _get_embed_model_a()
+            vec = model.encode(text[:2000], normalize_embeddings=True)
+            return vec.tolist()
         except Exception:
             return []
 
