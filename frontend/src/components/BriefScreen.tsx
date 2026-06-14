@@ -81,6 +81,8 @@ export function BriefScreen({ onPick }: Props) {
   const [loading, setLoading] = useState(true)
   const [synthesis, setSynthesis] = useState<string | null>(null)
   const [synthesizing, setSynthesizing] = useState(false)
+  const [synthError, setSynthError] = useState<string | null>(null)
+  const [weekSynthError, setWeekSynthError] = useState<string | null>(null)
   const [expanded, setExpanded] = useState(false)
   const [read, setRead] = useState(false)
   const [weekSynthesis, setWeekSynthesis] = useState<string | null>(null)
@@ -104,7 +106,10 @@ export function BriefScreen({ onPick }: Props) {
     setWeekSynthesizing(true)
     briefWeeklySynthesize(daily_entries)
       .then(r => { weekSynthCache[weekKey] = r.synthesis; setWeekSynthesis(r.synthesis) })
-      .catch(() => {})
+      .catch(() => {
+        weekSynthRequested.delete(weekKey)
+        setWeekSynthError('AI model unavailable — weekly synthesis will retry when the GPU is ready.')
+      })
       .finally(() => setWeekSynthesizing(false))
   }, [tab, dates, synthLanded])
 
@@ -127,6 +132,7 @@ export function BriefScreen({ onPick }: Props) {
     // Restore from cache immediately if available
     setSynthesis(synthCache[selectedDate] ?? null)
     setSynthesizing(false)
+    setSynthError(null)
     getBrief(selectedDate)
       .then(g => {
         setGrouped(g)
@@ -142,7 +148,10 @@ export function BriefScreen({ onPick }: Props) {
               setSynthesis(r.synthesis)
               setSynthLanded(n => n + 1)
             })
-            .catch(() => {})
+            .catch(() => {
+              synthRequested.delete(selectedDate)
+              setSynthError('AI model unavailable — synthesis will retry when the GPU is ready.')
+            })
             .finally(() => setSynthesizing(false))
         }
       })
@@ -253,7 +262,14 @@ export function BriefScreen({ onPick }: Props) {
                   </p>
                 </div>
               )}
-              {!weekSynthesis && !weekSynthesizing && dates.slice(0, 7).filter(d => synthCache[d.date]).length < 2 && (
+              {weekSynthError && !weekSynthesizing && !weekSynthesis && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 14 }}>
+                  <p className="font-mono" style={{ margin: 0, fontSize: 11, color: 'rgba(255,200,100,0.9)', fontWeight: 700, lineHeight: 1.4 }}>
+                    ⚠ {weekSynthError}
+                  </p>
+                </div>
+              )}
+              {!weekSynthesis && !weekSynthesizing && !weekSynthError && dates.slice(0, 7).filter(d => synthCache[d.date]).length < 2 && (
                 <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 14 }}>
                   <p className="font-mono" style={{ margin: 0, fontSize: 11, color: 'rgba(255,255,255,0.4)', letterSpacing: '0.04em' }}>
                     Visit at least 2 daily briefs to unlock the weekly thread synthesis.
@@ -341,6 +357,18 @@ export function BriefScreen({ onPick }: Props) {
                   <p style={{ margin: 0, fontSize: 15, lineHeight: 1.6, color: 'rgba(255,255,255,0.9)', fontWeight: 400 }}>
                     {synthesis}
                   </p>
+                </div>
+              )}
+              {synthError && !synthesizing && !synthesis && (
+                <div style={{ borderTop: '1px solid rgba(255,255,255,0.15)', paddingTop: 14, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <p className="font-mono" style={{ margin: 0, fontSize: 11, color: 'rgba(255,200,100,0.9)', fontWeight: 700, lineHeight: 1.4 }}>
+                    ⚠ {synthError}
+                  </p>
+                  <button
+                    onClick={() => { setSynthError(null); synthRequested.delete(selectedDate); setSynthesizing(false) }}
+                    className="font-mono"
+                    style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 10px', border: '1px solid rgba(255,255,255,0.3)', background: 'transparent', color: 'rgba(255,255,255,0.7)', cursor: 'pointer', letterSpacing: '0.06em' }}
+                  >↺ Retry</button>
                 </div>
               )}
             </div>

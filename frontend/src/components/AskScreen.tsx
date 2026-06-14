@@ -553,13 +553,9 @@ export function AskScreen({ onPick }: Props) {
                     display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16,
                   }}>
                     <p className="font-mono" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--ink-soft)' }}>
-                      {synthesis.error?.includes('HTTP')
-                        ? 'Server error — restart the backend and try again.'
-                        : synthesis.error?.includes('Empty')
-                          ? 'LM returned empty response — model may still be loading. Try again.'
-                          : synthesis.error
-                            ? synthesis.error
-                            : 'No notes have summaries yet — captures may still be processing.'}
+                      {synthesis.error
+                        ? 'AI model unavailable — GPU may be warming up. Wait a moment and retry.'
+                        : 'No notes have summaries yet — captures may still be processing.'}
                     </p>
                     <button
                       onClick={runSynthesize}
