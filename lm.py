@@ -10,7 +10,7 @@ INTENTS = ("learn", "act", "reference", "ephemeral")
 from config import LM_STUDIO_URL, LM_MODEL, HF_MODEL, HF_VL_MODEL, EMBED_MODEL
 
 USE_LM_STUDIO = bool(LM_STUDIO_URL)
-SIMILARITY_THRESHOLD = 0.70 if USE_LM_STUDIO else 0.50
+SIMILARITY_THRESHOLD = 0.70 if USE_LM_STUDIO else 0.62
 
 # ── cosine similarity ──────────────────────────────────────────────────────────
 
