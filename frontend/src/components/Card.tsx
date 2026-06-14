@@ -148,8 +148,22 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
           </div>
         )}
 
+        {/* Delete button for failed captures */}
+        {capture.summary?.startsWith('⚠') && variant === 'feed' && onDelete && (
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
+            <p className="font-mono" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--act)' }}>
+              {capture.summary}
+            </p>
+            <button
+              onClick={handleDismiss}
+              className="font-mono"
+              style={{ flexShrink: 0, fontSize: 11, fontWeight: 700, padding: '4px 10px', border: '2px solid var(--act)', background: 'var(--paper)', color: 'var(--act)', cursor: 'pointer', letterSpacing: '0.06em' }}
+            >Delete</button>
+          </div>
+        )}
+
         {/* Claims as bullet points (if available), else summary */}
-        {capture.summary ? (
+        {capture.summary && !capture.summary.startsWith('⚠') ? (
           Array.isArray(capture.claims) && capture.claims.length > 1 ? (
             <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 6 }}>
               {capture.claims.map((claim, i) => (
