@@ -10,7 +10,8 @@ INTENTS = ("learn", "act", "reference", "ephemeral")
 from config import LM_STUDIO_URL, LM_MODEL, HF_MODEL, HF_VL_MODEL, EMBED_MODEL
 
 USE_LM_STUDIO = bool(LM_STUDIO_URL)
-SIMILARITY_THRESHOLD = 0.70 if USE_LM_STUDIO else 0.62
+SIMILARITY_THRESHOLD = 0.70 if USE_LM_STUDIO else 0.55
+SIMILARITY_FLOOR = 0.40  # never connect below this regardless of rank
 
 # ── cosine similarity ──────────────────────────────────────────────────────────
 
@@ -20,12 +21,15 @@ def _cosine(a, b):
     return dot / mag if mag else 0.0
 
 
-def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: int = 3) -> list:
+def find_related(embedding: list, all_embeddings: list, exclude_id: int, top_n: int = 2) -> list:
+    """Return top_n most similar captures above SIMILARITY_FLOOR.
+    Rank-based (not threshold-based) so graph stays sparse even in domain-specific corpora.
+    """
     if not embedding or not all_embeddings:
         return []
     scored = [(cid, _cosine(embedding, emb)) for cid, emb in all_embeddings if cid != exclude_id]
     scored.sort(key=lambda x: x[1], reverse=True)
-    return [cid for cid, score in scored[:top_n] if score >= SIMILARITY_THRESHOLD]
+    return [cid for cid, score in scored[:top_n] if score >= SIMILARITY_FLOOR]
 
 
 # ── prompts ────────────────────────────────────────────────────────────────────
