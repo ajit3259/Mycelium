@@ -134,7 +134,9 @@ export default function App() {
   // Pending capture ID — poll until processing completes
   const pendingIdRef = useRef<number | null>(null)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const shownGuessIds = useRef<Set<number>>(new Set())
+  const shownGuessIds = useRef<Set<number>>(
+    new Set(JSON.parse(sessionStorage.getItem('shownGuessIds') || '[]') as number[])
+  )
 
   function startPolling(id: number) {
     pendingIdRef.current = id
@@ -150,6 +152,7 @@ export default function App() {
           setRefreshTrigger(t => t + 1)
         } else if (!shownGuessIds.current.has(found.id)) {
           shownGuessIds.current.add(found.id)
+          sessionStorage.setItem('shownGuessIds', JSON.stringify([...shownGuessIds.current]))
           setPendingGuess(found)
         }
       }
@@ -168,6 +171,7 @@ export default function App() {
       )
       if (missed) {
         shownGuessIds.current.add(missed.id)
+        sessionStorage.setItem('shownGuessIds', JSON.stringify([...shownGuessIds.current]))
         setPendingGuess(missed)
       }
     }).catch(() => {})
@@ -326,6 +330,7 @@ export default function App() {
                     variant="surface"
                     onAction={() => setSelectedCapture(null)}
                     onPick={handlePick}
+                    onDelete={() => { setSelectedCapture(null); setRefreshTrigger(t => t + 1) }}
                   />
                 </div>
               ) : (

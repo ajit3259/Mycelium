@@ -149,7 +149,7 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
         )}
 
         {/* Delete button for failed captures */}
-        {capture.summary?.startsWith('⚠') && variant === 'feed' && onDelete && (
+        {capture.summary?.startsWith('⚠') && onDelete && (
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 8, marginBottom: 8 }}>
             <p className="font-mono" style={{ margin: 0, fontSize: 12, fontWeight: 700, color: 'var(--act)' }}>
               {capture.summary}
@@ -196,14 +196,14 @@ export function Card({ capture, variant, onAction, onPick, onDelete }: CardProps
                 </p>
               )}
             </div>
-            {variant === 'feed' && onDelete && (
+            {onDelete && (
               <button
                 onClick={handleDismiss}
-                title="Dismiss"
+                title="Delete"
                 className="font-mono"
-                style={{ flexShrink: 0, fontSize: 14, lineHeight: 1, padding: '2px 6px', border: '2px solid var(--line)', background: 'var(--paper)', color: 'var(--ink-soft)', cursor: 'pointer' }}
+                style={{ flexShrink: 0, fontSize: variant === 'surface' ? 12 : 14, fontWeight: 700, lineHeight: 1, padding: variant === 'surface' ? '6px 14px' : '2px 6px', border: '2px solid var(--act)', background: 'var(--paper)', color: 'var(--act)', cursor: 'pointer', letterSpacing: '0.06em' }}
               >
-                ×
+                {variant === 'surface' ? 'Delete' : '×'}
               </button>
             )}
           </div>
