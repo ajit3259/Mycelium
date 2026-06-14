@@ -4,10 +4,12 @@ import { searchCaptures, getCapturesByIntent, askSynthesize, askExtend, askFeynm
 import { Card } from './Card'
 
 const SUGGESTIONS = [
-  'GPU inference and memory bandwidth',
+  'what do I know about LLM inference?',
   'what should I act on?',
-  'spaced repetition',
+  'how does spaced repetition work?',
+  'what have I saved about embeddings?',
   'things to learn this week',
+  'how to build and ship faster',
 ]
 
 type QueryMode = 'search' | 'intent'
