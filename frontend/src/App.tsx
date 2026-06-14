@@ -1,6 +1,6 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
 import type { Capture, Mood, NavView } from './types'
-import { getCaptureRelated, getCaptures, getReviewQueue } from './api'
+import { getCaptureRelated, getCaptures, getCaptureById, getReviewQueue } from './api'
 import { CaptureBar } from './components/CaptureBar'
 import { SurfacePanel } from './components/SurfacePanel'
 import { Feed } from './components/Feed'
@@ -128,6 +128,7 @@ export default function App() {
   const [selectedCapture, setSelectedCapture] = useState<Capture | null>(null)
   const [mood, setMood] = useState<Mood | ''>('')
   const [pendingGuess, setPendingGuess] = useState<Capture | null>(null)
+  const [pinnedCapture, setPinnedCapture] = useState<Capture | null>(null)
   const [errorToast, setErrorToast] = useState<string | null>(null)
   const [reviewCount, setReviewCount] = useState(0)
 
@@ -144,8 +145,11 @@ export default function App() {
     pollRef.current = setInterval(async () => {
       const all = await getCaptures(50).catch(() => [])
       const found = all.find(c => c.id === pendingIdRef.current)
+      // Update pinned capture with latest state (e.g. once summary arrives)
+      if (found) setPinnedCapture(found)
       if (found?.summary && found?.intent) {
         pendingIdRef.current = null
+        setPinnedCapture(null)
         if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
         if (found.summary.startsWith('⚠')) {
           setErrorToast('Processing failed — the AI model is unavailable. Delete the card and try again.')
@@ -197,9 +201,13 @@ export default function App() {
   }, [view])
 
   function handleCapture(id: number) {
-    setRefreshTrigger(n => n + 1)
     setView('home')
     startPolling(id)
+    // Fetch and pin the capture immediately so it appears at top of Just Added
+    // regardless of server timestamp (avoids clock skew hiding new captures)
+    getCaptureById(id).then(c => { if (c) setPinnedCapture(c) }).catch(() => {})
+    // Also trigger a feed refresh
+    setRefreshTrigger(n => n + 1)
   }
 
   function dismissGuess() {
@@ -340,6 +348,7 @@ export default function App() {
                   onPick={handlePick}
                   limit={3}
                   compact
+                  pinnedCapture={pinnedCapture}
                   onBrowseAll={() => setView('browse')}
                 />
               )}

@@ -23,6 +23,12 @@ export async function getCaptureRelated(id: number): Promise<Capture[]> {
   return r.json()
 }
 
+export async function getCaptureById(id: number): Promise<import('./types').Capture | null> {
+  const r = await fetch(`/captures/${id}`)
+  if (!r.ok) return null
+  return r.json()
+}
+
 export async function captureText(content: string, yourTake = ''): Promise<{ id: number }> {
   const fd = new FormData()
   fd.append('content', content)

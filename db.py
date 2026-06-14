@@ -135,6 +135,20 @@ def get_captures_by_intent(intent: str, limit=50):
         return result
 
 
+def get_capture_by_id(capture_id: int):
+    with sqlite3.connect(DB_PATH) as conn:
+        conn.row_factory = sqlite3.Row
+        row = conn.execute("SELECT * FROM captures WHERE id=?", (capture_id,)).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["tags"] = json.loads(d["tags"] or "[]")
+        d["related_ids"] = json.loads(d.get("related_ids") or "[]")
+        d["claims"] = json.loads(d.get("claims") or "[]")
+        d.pop("embedding", None)
+        return d
+
+
 def get_captures(limit=50):
     with sqlite3.connect(DB_PATH) as conn:
         conn.row_factory = sqlite3.Row

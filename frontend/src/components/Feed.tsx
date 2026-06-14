@@ -9,10 +9,11 @@ interface Props {
   onPick?: (c: Capture) => void
   limit?: number
   compact?: boolean
+  pinnedCapture?: Capture | null
   onBrowseAll?: () => void
 }
 
-export function Feed({ refreshTrigger, onCountChange, onPick, limit = 20, compact = false, onBrowseAll }: Props) {
+export function Feed({ refreshTrigger, onCountChange, onPick, limit = 20, compact = false, pinnedCapture, onBrowseAll }: Props) {
   const [captures, setCaptures] = useState<Capture[]>([])
   const [loading, setLoading] = useState(false)
   const pollRef = useRef<ReturnType<typeof setInterval> | null>(null)
@@ -94,7 +95,16 @@ export function Feed({ refreshTrigger, onCountChange, onPick, limit = 20, compac
         )}
 
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-          {captures.map(c => (
+          {pinnedCapture && (
+            <Card
+              key={`pinned-${pinnedCapture.id}`}
+              capture={pinnedCapture}
+              variant="feed"
+              onPick={onPick}
+              onDelete={id => setCaptures(prev => prev.filter(x => x.id !== id))}
+            />
+          )}
+          {captures.filter(c => c.id !== pinnedCapture?.id).map(c => (
             <Card
               key={c.id}
               capture={c}

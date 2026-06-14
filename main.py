@@ -123,6 +123,15 @@ async def list_captures(limit: int = 50, intent: Optional[str] = None):
     return get_captures(limit)
 
 
+@app.get("/captures/{capture_id}")
+async def get_capture(capture_id: int):
+    from db import get_capture_by_id
+    c = get_capture_by_id(capture_id)
+    if not c:
+        raise HTTPException(status_code=404)
+    return c
+
+
 @app.get("/captures/{capture_id}/related")
 async def related_captures(capture_id: int):
     from db import get_all_embeddings
