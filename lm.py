@@ -264,7 +264,7 @@ if USE_LM_STUDIO:
     def embed(text: str) -> list:
         try:
             resp = _client.embeddings.create(
-                model="text-embedding-nomic-embed-text-v1.5", input=text[:2000]
+                model="BAAI/bge-base-en-v1.5", input=text[:2000]
             )
             return resp.data[0].embedding
         except Exception:
