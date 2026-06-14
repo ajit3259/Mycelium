@@ -68,10 +68,15 @@ interface Props {
 }
 
 export function BriefScreen({ onPick }: Props) {
-  const today = new Date().toISOString().slice(0, 10)
+  const browserToday = new Date().toISOString().slice(0, 10)
   const [tab, setTab] = useState<'day' | 'week'>('day')
   const [dates, setDates] = useState<{ date: string; count: number }[]>([])
-  const [selectedDate, setSelectedDate] = useState<string>(today)
+  // "today" is the most recent date the server has data for (within 2 days of browser UTC date)
+  // This avoids timezone skew where browser UTC date != server stored date
+  const today = dates.length > 0 && dates[0].date >= new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+    ? dates[0].date
+    : browserToday
+  const [selectedDate, setSelectedDate] = useState<string>(browserToday)
   const [grouped, setGrouped] = useState<Record<string, Capture[]>>({})
   const [loading, setLoading] = useState(true)
   const [synthesis, setSynthesis] = useState<string | null>(null)
@@ -104,7 +109,15 @@ export function BriefScreen({ onPick }: Props) {
   }, [tab, dates, synthLanded])
 
   useEffect(() => {
-    getBriefDates().then(setDates).catch(() => {})
+    getBriefDates().then(d => {
+      setDates(d)
+      // Snap selectedDate to the server's most recent date if it's close to browser today
+      if (d.length > 0) {
+        const serverLatest = d[0].date
+        const twoDaysAgo = new Date(Date.now() - 2 * 86400000).toISOString().slice(0, 10)
+        if (serverLatest >= twoDaysAgo) setSelectedDate(serverLatest)
+      }
+    }).catch(() => {})
   }, [])
 
   useEffect(() => {

@@ -324,13 +324,14 @@ def get_brief(limit=50, date: str = None) -> list:
             rows = conn.execute("""
                 SELECT * FROM captures
                 WHERE summary IS NOT NULL
+                  AND summary NOT LIKE '⚠%'
                   AND date(created_at) = ?
                 ORDER BY created_at DESC
             """, (date,)).fetchall()
         else:
             rows = conn.execute("""
                 SELECT * FROM captures
-                WHERE summary IS NOT NULL AND reviewed = 0
+                WHERE summary IS NOT NULL AND summary NOT LIKE '⚠%' AND reviewed = 0
                 ORDER BY created_at DESC
                 LIMIT ?
             """, (limit,)).fetchall()
