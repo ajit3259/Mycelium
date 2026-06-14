@@ -265,9 +265,14 @@ if USE_LM_STUDIO:
         if not model:
             return ""
         resp = _client.chat.completions.create(
-            model=model, messages=[{"role": "user", "content": prompt}]
+            model=model,
+            messages=[{"role": "user", "content": prompt}],
+            extra_body={"thinking": {"budget_tokens": 0}},
         )
-        return resp.choices[0].message.content
+        text = resp.choices[0].message.content or ""
+        # strip <think>…</think> blocks if model still emits them
+        text = re.sub(r"<think>.*?</think>", "", text, flags=re.DOTALL).strip()
+        return text
 
     def embed(text: str) -> list:
         try:
