@@ -52,15 +52,15 @@ async def startup():
             print(f"[seed] {e}")
     else:
         try:
-            from db import get_all_embeddings, get_captures as _gc2, update_capture
+            import sqlite3 as _sq, json as _json
+            from db import get_all_embeddings, DB_PATH
             from lm import find_related
             all_embs = get_all_embeddings()
-            for c in _gc2(limit=2000):
-                emb_row = next((e for cid, e in all_embs if cid == c["id"]), None)
-                if not emb_row:
-                    continue
-                related = find_related(emb_row, all_embs, exclude_id=c["id"])
-                update_capture(c["id"], c["summary"], c.get("tags", []), c.get("intent"), emb_row, related)
+            for cid, emb_row in all_embs:
+                related = find_related(emb_row, all_embs, exclude_id=cid)
+                with _sq.connect(DB_PATH) as _conn:
+                    _conn.execute("UPDATE captures SET related_ids=? WHERE id=?",
+                                  (_json.dumps(related), cid))
             print(f"[startup] related_ids backfill complete ({len(all_embs)} captures)")
         except Exception as e:
             print(f"[startup backfill] {e}")
