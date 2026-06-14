@@ -128,6 +128,7 @@ export default function App() {
   const [selectedCapture, setSelectedCapture] = useState<Capture | null>(null)
   const [mood, setMood] = useState<Mood | ''>('')
   const [pendingGuess, setPendingGuess] = useState<Capture | null>(null)
+  const [errorToast, setErrorToast] = useState<string | null>(null)
   const [reviewCount, setReviewCount] = useState(0)
 
   // Pending capture ID — poll until processing completes
@@ -142,12 +143,15 @@ export default function App() {
       const all = await getCaptures(50).catch(() => [])
       const found = all.find(c => c.id === pendingIdRef.current)
       if (found?.summary && found?.intent) {
-        if (!shownGuessIds.current.has(found.id)) {
+        pendingIdRef.current = null
+        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
+        if (found.summary.startsWith('⚠')) {
+          setErrorToast('Processing failed — the AI model is unavailable. Delete the card and try again.')
+          setRefreshTrigger(t => t + 1)
+        } else if (!shownGuessIds.current.has(found.id)) {
           shownGuessIds.current.add(found.id)
           setPendingGuess(found)
         }
-        pendingIdRef.current = null
-        if (pollRef.current) { clearInterval(pollRef.current); pollRef.current = null }
       }
     }, 3000)
   }
@@ -269,6 +273,23 @@ export default function App() {
               <div style={{ flexShrink: 0 }}>
                 <CaptureBar onCapture={handleCapture} />
               </div>
+              {errorToast && (
+                <div style={{
+                  flexShrink: 0,
+                  border: 'var(--bw) solid var(--act)',
+                  boxShadow: '3px 3px 0 var(--act)',
+                  padding: '12px 14px',
+                  display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12,
+                }}>
+                  <p style={{ margin: 0, fontSize: 13, fontFamily: 'var(--font-mono)', color: 'var(--act)', lineHeight: 1.4 }}>
+                    {errorToast}
+                  </p>
+                  <button onClick={() => setErrorToast(null)} style={{
+                    background: 'none', border: 'none', cursor: 'pointer',
+                    color: 'var(--fg)', fontSize: 16, lineHeight: 1, flexShrink: 0, padding: 0,
+                  }}>✕</button>
+                </div>
+              )}
               {pendingGuess && (
                 <div style={{ flexShrink: 0 }}>
                   <AgentGuess capture={pendingGuess} onConfirm={dismissGuess} onUpdate={updateGuess} />
