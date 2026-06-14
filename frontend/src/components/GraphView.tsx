@@ -39,7 +39,7 @@ export function GraphView({ onPick }: Props) {
 
   useEffect(() => {
     getCaptures(500).then(data => {
-      setCaptures(data)
+      setCaptures(data.filter(c => c.summary && !c.summary.startsWith('⚠')))
       setLoading(false)
     })
   }, [])
